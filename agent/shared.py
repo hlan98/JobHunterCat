@@ -1237,7 +1237,8 @@ def build_resume_profile(
                     "请基于下面简历内容抽取，不要臆造经验。\n\n"
                     f"{clamp_text(resume_text, 12000)}"
                 ),
-                max_tokens=900,
+                # 2026-09-24 MAXTOK：同上（技能提取也要正文），抬到 2500
+                max_tokens=2500,
             )
             raw_skills = payload.get("skills", [])
             skills = split_keywords(raw_skills if isinstance(raw_skills, list) else str(raw_skills))
@@ -1368,7 +1369,9 @@ def llm_match_score(
                 f"候选人简历：\n{clamp_text(resume_text, 6000)}\n\n"
                 f"职位 JD：\n{clamp_text(jd_text, 5000)}"
             ),
-            max_tokens=900,
+            # 2026-09-24 MAXTOK：900 会被推理预算吃光 → content 恒空 → 评分全退回启发式
+            #（实测 900→content 0 字 / 2000→正常 JSON），抬到 2500
+            max_tokens=2500,
             temperature=0.1,
         )
         score = int(payload.get("score", 0))

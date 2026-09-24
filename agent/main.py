@@ -2171,7 +2171,8 @@ class PetApp:
                     + "\n\n请用清晰分步的方式教用户：先给官网路径（www.zhipin.com → 右上角头像「我的简历」"
                       "→ 右侧「附件简历/附件管理」→「上传简历/作品集」），再提示「聊一聊」里发简历→上传这条备用路。"
                       "语气友好，控制在 200 字内；用户问题里有具体困惑先针对性解答。",
-                    "", max_tokens=300, temperature=0.3) or "").strip()
+                    # 2026-09-24 MAXTOK-GUIDE：同上；抬到 2000 后 ask（针对性解答）才走得到
+                    "", max_tokens=2000, temperature=0.3) or "").strip()
                 if guide:
                     self.root.after(0, lambda g=guide: self.set_bubble("📤 " + g))
                     return
@@ -2290,7 +2291,8 @@ class PetApp:
                       "但产品（桌面宠物求职 Agent）必须依赖 Chrome（远程调试端口 9222 投递浏览器）才能工作。\n"
                       "请给出安装步骤：①官网下载地址（google.cn/chrome 或 google.com/chrome）；"
                       "②安装要点（默认选项即可）；③装好后回到对话框告诉喵。控制在 150 字内。",
-                    "", max_tokens=200, temperature=0.3) or "").strip()
+                    # 2026-09-24 MAXTOK-GUIDE：200 会被推理预算吃光 → content 空 → 永远走静态兜底
+                    "", max_tokens=2000, temperature=0.3) or "").strip()
                 if guide:
                     self.root.after(0, lambda g=guide: self.set_bubble("🌐 未检测到 Chrome：\n" + g))
                     return
@@ -6903,7 +6905,8 @@ class PetApp:
                 "控制在 200 字内，像猫聊天，不要罗列表格。"
             ) % (_j.dumps(rec, ensure_ascii=False),
                  "、".join((plan.get("keywords") or [])[:8]), plan.get("min_score", 75))
-            rep = (llm.chat_text("你是找工作喵的求职 Agent「爬爬」。", prompt, max_tokens=900, temperature=0.5) or "").strip()
+            # 2026-09-24 MAXTOK：同上，抬到 2000
+            rep = (llm.chat_text("你是找工作喵的求职 Agent「爬爬」。", prompt, max_tokens=2000, temperature=0.5) or "").strip()
             self.root.after(0, lambda r=rep: self.set_bubble("📊 中途情况：\n" + (r or "暂无数据")[:500]))
             self.add_log("投递中：LLM 生成中途情况报告")
         except Exception as exc:
@@ -7121,7 +7124,8 @@ class PetApp:
                 # 这里加大预算并明确禁止推理过程。
                 "\n\n【重要】直接输出最终结果，不要推理过程、不要思考步骤。"
             )
-            raw = (llm.chat_text(sys_prompt, text, max_tokens=900, temperature=0.3) or "").strip()
+            # 2026-09-24 MAXTOK：900 会被推理预算吃光 → content 空（实测）→ 抬到 2000
+            raw = (llm.chat_text(sys_prompt, text, max_tokens=2000, temperature=0.3) or "").strip()
             if not raw:
                 self.root.after(0, lambda: (self.set_bubble(
                     # 2026-09-19 G3：原文案甩锅「密钥 / 网络」是**误导** ——

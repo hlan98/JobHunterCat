@@ -779,7 +779,8 @@ def generate_conversation_reply(
         "请给出回复（或 ONLY_ESCALATE）："
     )
     try:
-        reply = llm.chat_text(system_prompt, user_prompt, max_tokens=300, temperature=0.4)
+        # 2026-09-24 MAXTOK：300 会被推理预算吃光（实测同类调用 900 都会空），抬到 1200
+        reply = llm.chat_text(system_prompt, user_prompt, max_tokens=1200, temperature=0.4)
     except Exception:
         return False, ""
     reply = reply.strip()
