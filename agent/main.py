@@ -396,6 +396,28 @@ class PetApp:
                     "喵~我是爬爬！先跟你说一件事：我还没配置 LLM，没法从简历提炼关键词。\n\n"
                     "① 右键点我 →「📊 分析报告」打开看板 → 切到「设置 · LLM」，填好 base_url / 密钥 / 模型 并保存；\n"
                     "② 然后把简历拖给我，我就给你出方案啦～")
+            else:
+                # 2026-09-24 RESUMELLM：已配置 → **后台**探一次连通性（不阻塞启动）。
+                # 用户实测：新机器上没配 / 连不上 LLM 时，拖简历会静默降级成「没有关键信息的回复」。
+                def _llm_ping_startup():
+                    try:
+                        _txt = _llm0.chat_text("ping", max_tokens=200, temperature=0.0) or ""
+                        if not str(_txt).strip():
+                            self.add_log("启动检查：LLM 连通性异常（返回为空）")
+                            self.root.after(0, lambda: self.set_bubble(
+                                "⚠️ LLM 配置看着是好的，但**探测返回为空** ——\n"
+                                "多半是推理模型把输出预算耗在思考上（不是网络/密钥问题），重试通常即可。"))
+                    except Exception as _e0:
+                        _msg = str(_e0)[:120]
+                        self.add_log("启动检查：LLM 连不上（%s）" % _msg)
+                        self.root.after(0, lambda m=_msg: self.set_bubble(
+                            "⚠️ LLM 连不上：%s\n\n"
+                            "简历诊断 / 投递关键词 / 岗位评分都会受影响。\n"
+                            "请检查密钥与网络；若装了代理软件，确认它已启动（或关掉系统代理）。" % m))
+                try:
+                    threading.Thread(target=_llm_ping_startup, daemon=True).start()
+                except Exception:
+                    pass
         except Exception:
             pass
         # 2026-09-24 CHROMECHK：新用户引导 —— 没装 Chrome，投递浏览器（9222）就起不来。
@@ -834,6 +856,7 @@ class PetApp:
             except Exception:
                 pass
         diag = ""
+        _llm_ok = False   # 2026-09-24 RESUMELLM：LLM 是否真的给出了正文（供气泡提示用）
         try:
             llm = shared.build_llm_client(self.cfg)
             if getattr(llm, "is_configured", lambda: False)():
@@ -841,6 +864,8 @@ class PetApp:
                 diag = (llm.chat_text(
                     "你是资深 HR 与求职顾问。用 3~4 句话点评这份简历的求职竞争力：先说 2 个亮点，再说 1~2 个短板，最后给 1 条改进建议。不要客套，直接输出。",
                     "【简历内容】\n" + text[:2500], max_tokens=4000, temperature=0.4) or "").strip()
+                # 调了但拿不到正文（推理预算耗尽 / 网络异常）→ 同样算「不可用」
+                _llm_ok = bool(diag)
         except Exception:
             diag = ""
         self.session["resume_analyzed"] = True
@@ -873,6 +898,14 @@ class PetApp:
                 source_name, n, "、".join(skills[:8]) if skills else "未识别到")
             if diag:
                 body += "\n\nLLM 诊断：\n" + diag[:260]
+            if not _llm_ok:
+                # 2026-09-24 RESUMELLM：LLM 不可用**不能静默降级** ——
+                # 否则新用户只收到一份「没有关键信息」的分析，完全不知道是没连上 LLM（用户实测踩过）。
+                body += ("\n\n⚠️ 但我**没连上 LLM**，所以上面只有本地技能提取 ——\n"
+                         "「简历诊断 / 投递关键词 / 投放方案」都做不了，岗位评分也只能走本地启发式"
+                         "（分数偏低、容易全被过滤）。\n\n"
+                         "请右键点我 →「📊 分析报告」→「设置 · LLM」，填好 base_url / 密钥 / 模型 并保存，\n"
+                         "然后把简历**重新拖一次**，我就能给你完整分析。")
             body += "\n\n已更新 run/resume.md（当前生效简历：%s，后续评分/开始投递按这份）。" % source_name
             self.set_bubble(body)
             self.add_log("简历分析完成：%s（%d 字，%d 技能）" % (source_name, n, len(skills)))
