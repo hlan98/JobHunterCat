@@ -381,7 +381,7 @@ No timelines — only the directions currently being explored.
 ### 探索中 / Exploring
 
 - 更多求职平台<br>More job platforms
-- 英文界面与文档<br>English UI and documentation
+- 英文界面（文档已中英双语）<br>English UI (docs are already bilingual)
 - 社区 skill<br>Community skills
 - Agent 评估框架<br>An agent evaluation framework
 
@@ -553,6 +553,10 @@ For commercial licensing, contact: **Leo He**
 许可边界声明见 [`NOTICE`](NOTICE)；MIT 全文见 [`LICENSES/MIT-job-hunter-skill.txt`](LICENSES/MIT-job-hunter-skill.txt)。
 
 The licence boundary statement is in [`NOTICE`](NOTICE); the full MIT text is in [`LICENSES/MIT-job-hunter-skill.txt`](LICENSES/MIT-job-hunter-skill.txt).
+
+> **语言说明**：本文件的英文为译文；如中英文表述不一致，**以中文为准**。
+>
+> **Language**: the English text is a translation; where it conflicts with the Chinese, **the Chinese version governs**.
 
 > ⚠️ 以上为**事实声明**，不构成法律意见。混合文件的授权问题涉及衍生作品认定、
 > 贡献者权利等具体法律问题，如有需要请咨询专业人士。
