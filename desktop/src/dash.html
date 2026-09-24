@@ -231,6 +231,15 @@ body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(-
         <div class="field"><label>Base URL</label><input id="llm-url" placeholder="例如 https://api.openai.com/v1"></div>
         <div class="field"><label>API Key</label><input id="llm-key" type="password" placeholder="sk-..."></div>
         <div class="field"><label>Model</label><input id="llm-model" placeholder="拉取后从下方列表点选"></div>
+        <!-- 2026-09-24 RESUMEOPT：这个开关原先**界面上没有**，默认 false →
+             岗位评分会把简历清空、永远走启发式（分数偏低、可能全被过滤）。这里补上。 -->
+        <div class="field" style="display:flex;align-items:flex-start;gap:8px;">
+          <input id="llm-allow-resume" type="checkbox" style="width:auto;margin-top:3px;">
+          <label for="llm-allow-resume" style="margin:0;cursor:pointer;line-height:1.5;">
+            允许把简历正文发给 LLM 做匹配评分<br>
+            <span style="color:#8a857d;font-size:12px;">关闭时评分只能走本地启发式，分数会偏低、容易全被过滤。</span>
+          </label>
+        </div>
         <div class="row">
           <button class="btn btn-ghost" onclick="fetchModels()">🔄 拉取模型</button>
           <button class="btn btn-primary" onclick="saveLlm()">💾 保存</button>
@@ -252,6 +261,10 @@ function go(p){
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
   go(b.dataset.page);
   if(b.dataset.page==='insights') loadReports();   // 2026-09-18 复盘报告
+  // 2026-09-24 RESUMEOPT2：进「设置」页时拉取当前 LLM 配置。
+  // 否则输入框与「允许上传简历」勾选框都是空/未勾选 ——
+  // 用户一点保存就会把开关改回 false，评分又退回启发式。
+  if(b.dataset.page==='settings') act({cmd:'call', action:'llm_settings'});
 });
 
 function addLog(t){
@@ -599,6 +612,11 @@ window.bridge.onEvent(msg=>{
     if(msg.llm){
       document.getElementById('llm-url').value = msg.llm.base_url||'';
       document.getElementById('llm-model').value = msg.llm.model||'';
+      // 2026-09-24 RESUMEOPT：回填「允许上传简历」开关
+      var _arEl0 = document.getElementById('llm-allow-resume');
+      if(_arEl0 && msg.llm.allow_resume_upload !== undefined) _arEl0.checked = !!msg.llm.allow_resume_upload;
+      // 2026-09-24 RESUMEOPT2：进页面拉取的配置（loaded）不该提示「已保存」
+      if(msg.loaded) return;
       const box=document.getElementById('llm-status');
       box.innerHTML='<span style="color:var(--green);font-weight:600;">✅ 配置已保存</span>';
       showToast('✅ LLM 配置已保存');
@@ -644,7 +662,10 @@ function saveLlm(){
     if(st) st.textContent='请先点「🔄 拉取模型」，再从下方列表里点选一个模型，然后保存。';
     return;
   }
-  window.bridge.send({cmd:'save_llm', url:u, key:k, model:m});
+  // 2026-09-24 RESUMEOPT：一并保存「允许上传简历」开关
+  var _arEl = document.getElementById('llm-allow-resume');
+  window.bridge.send({cmd:'save_llm', url:u, key:k, model:m,
+                      allow_resume_upload: !!(_arEl && _arEl.checked)});
   if(st) st.textContent='✅ 已保存（模型：' + m + '）';
 }
 // URL / Key 一改动，已拉取的清单即作废 —— 必须重新拉取

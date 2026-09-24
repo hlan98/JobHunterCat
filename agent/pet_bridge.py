@@ -41,7 +41,8 @@ sys.path.insert(0, str(HERE))
 # ② `import job_hunter_skill` 必须落到工作副本内的那一份（与 main.py 同一份），
 #    否则会解析到沙箱里残留的旧副本。故把 SKILL_DIR 插到 sys.path 最前。
 SKILL_DIR = Path(os.environ.get(
-    "JOB_HUNTER_PACKAGE_DIR", str(HERE / "job-hunter-skill"))).expanduser().resolve()
+    # 2026-09-24 OSROOTFIX：开源副本的「包目录」就是仓库根（HERE 的上一层）
+    "JOB_HUNTER_PACKAGE_DIR", str(HERE.parent))).expanduser().resolve()
 if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 RUN_DIR = Path(os.environ.get(
@@ -53,7 +54,8 @@ RUN_DIR = Path(os.environ.get(
 # ② `import job_hunter_skill` 必须落到工作副本内的那一份（与 main.py 同一份），
 #    否则会解析到沙箱里残留的旧副本。故把 SKILL_DIR 插到 sys.path 最前。
 SKILL_DIR = Path(os.environ.get(
-    "JOB_HUNTER_PACKAGE_DIR", str(HERE / "job-hunter-skill"))).expanduser().resolve()
+    # 2026-09-24 OSROOTFIX：开源副本的「包目录」就是仓库根（HERE 的上一层）
+    "JOB_HUNTER_PACKAGE_DIR", str(HERE.parent))).expanduser().resolve()
 if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 RUN_DIR = Path(os.environ.get(
@@ -373,6 +375,10 @@ def _build_headless():
                 "base_url": llm.get("base_url", ""),
                 "api_key": llm.get("api_key", ""),
                 "model": llm.get("model", ""),
+                # 2026-09-24 RESUMEOPT：把「允许上传简历」开关回填给看板
+                "allow_resume_upload": bool(llm.get("allow_resume_upload", False)),
+                # 2026-09-24 RESUMEOPT2：标记「这是拉取，不是保存」→ 看板不弹「已保存」
+                "loaded": True,
             }})
 
         def _write_run_report(self, rec, kw_stats, stopped_by_user):
@@ -694,8 +700,12 @@ def _dispatch(app, cmd):
             if new_key:  # Key 框留空时保留已有 Key，不覆盖
                 app.cfg["llm"]["api_key"] = new_key
             app.cfg["llm"]["model"] = str(cmd.get("model", "")).strip()
+            # 2026-09-24 RESUMEOPT：保存「允许上传简历」开关
+            #（缺省不动，避免旧前端不带该字段时把开关意外关掉）
+            if "allow_resume_upload" in cmd:
+                app.cfg["llm"]["allow_resume_upload"] = bool(cmd.get("allow_resume_upload"))
             try:
-                (Path(__file__).resolve().parent / "job-hunter-skill" / "run" / "config.json").write_text(
+                (Path(__file__).resolve().parent.parent / "run" / "config.json").write_text(
                     _json.dumps(app.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
                 pass
@@ -815,9 +825,9 @@ def _dispatch(app, cmd):
                 plan["city"] = str(cmd["city"]).strip()
                 app.cfg["target_city"] = plan["city"]
             try:
-                (Path(__file__).resolve().parent / "job-hunter-skill" / "run" / "plan.json").write_text(
+                (Path(__file__).resolve().parent.parent / "run" / "plan.json").write_text(
                     _json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
-                (Path(__file__).resolve().parent / "job-hunter-skill" / "run" / "config.json").write_text(
+                (Path(__file__).resolve().parent.parent / "run" / "config.json").write_text(
                     _json.dumps(app.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
                 pass

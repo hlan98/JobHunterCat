@@ -19,14 +19,18 @@ from tkinter import font as tkfont
 
 from PIL import Image, ImageDraw, ImageTk
 
-DEMO_DIR = Path(__file__).resolve().parent
+# 2026-09-24 OSROOTFIX：开源副本目录结构是 agent/ + boss/ + desktop/（与工作副本的
+# v8-core/ + pet-shell/ 不同）→ 必须把**仓库根**放进 sys.path（`import agent.shared` /
+# `import boss.boss_apply` 才解析得到），SKILL_DIR / RUN_DIR / ASSETS 也都要以仓库根为基准。
+DEMO_DIR = Path(__file__).resolve().parent          # .../<repo>/agent
+REPO_ROOT = DEMO_DIR.parent                          # 仓库根
 SKILL_DIR = Path(os.environ.get(
-    "JOB_HUNTER_PACKAGE_DIR", str(DEMO_DIR / "job-hunter-skill")
+    "JOB_HUNTER_PACKAGE_DIR", str(REPO_ROOT)
 )).expanduser().resolve()
 RUN_DIR = Path(os.environ.get(
-    "JOB_HUNTER_HOME", str(SKILL_DIR / "run")
+    "JOB_HUNTER_HOME", str(REPO_ROOT / "run")
 )).expanduser().resolve()
-ASSETS = DEMO_DIR / "assets"
+ASSETS = REPO_ROOT / "assets"
 LOG_FILE = DEMO_DIR / "demo.log"
 
 
@@ -2949,7 +2953,15 @@ class PetApp:
                                 self._record_ledger_action("fail", "score_error", {"job": title, "company": company, "reason": str(e)[:100]})
                                 continue
                             if real and not getattr(res, "llm_ok", False):
-                                self._warn_llm_runtime("岗位评分回退到了启发式结果")
+                                # 2026-09-24 RESUMEOPT：区分「开关没开」与「LLM 真出问题」——
+                                # 前者是**必然**走启发式（简历被清空、压根没调 LLM），
+                                # 原来只报「回退到了启发式」，用户会误以为 LLM 挂了。
+                                if not bool((self.cfg.get("llm") or {}).get("allow_resume_upload", False)):
+                                    self._warn_llm_runtime(
+                                        "岗位评分走的是本地启发式 —— 因为「允许上传简历」没开"
+                                        "（看板 → 设置 · LLM 里勾上；否则分数偏低、容易全被过滤）")
+                                else:
+                                    self._warn_llm_runtime("岗位评分回退到了启发式结果")
                         _wait_if_paused()  # LLM 返回后若已暂停，立即停住
                         kw_scores.append(res.total_score)
                         # 不用缓存的 decision，用 total_score 和当前阈值重新判断
