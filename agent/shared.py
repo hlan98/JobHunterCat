@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen, build_opener, ProxyHandler
+# 2026-09-24 PROXYFIX：用于「LLM 请求优先直连」的 opener（见 _post_json）
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -888,9 +889,20 @@ class LLMClient:
             method="POST",
         )
 
+        # 2026-09-24 PROXYFIX：系统代理开着但代理没跑（或代理到不了该端点）时，
+        # urlopen 直接抛 10061「目标计算机积极拒绝」→ 整个 LLM 不可用（实测）。
+        # 实测绕过代理直连该端点 1.6s 正常，所以**先直连**；
+        # 只有连接层失败才退回系统代理（兼顾「端点必须走代理」的用户）。
         try:
-            with urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+            _direct = build_opener(ProxyHandler({}))
+            try:
+                with _direct.open(request, timeout=self.timeout) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except HTTPError:
+                raise   # HTTP 层错误（429/402…）交外层统一处理，不重试
+            except URLError:
+                with urlopen(request, timeout=self.timeout) as response:
+                    return json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="ignore")
             # 配额/余额耗尽检测：
@@ -914,7 +926,8 @@ class LLMClient:
                 )
             raise RuntimeError(f"LLM 请求失败（HTTP {exc.code}）：{body}") from exc
         except URLError as exc:
-            raise RuntimeError(f"LLM 请求失败：{exc}") from exc
+            raise RuntimeError(
+                f"LLM 请求失败：{exc}（已尝试直连与系统代理两条路；若装了代理软件，请确认它已启动，或在系统设置里关闭「使用代理服务器」）") from exc
 
     @staticmethod
     def _message_content(response: dict[str, Any]) -> str:
