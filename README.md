@@ -4,7 +4,7 @@
 
 # 🐱 JobHunter Cat · 找工作喵
 
-> **一只住在你电脑里的 AI 求职 Agent。**
+> **一只住在你桌面上的 AI 求职 Agent。**
 >
 > **A desktop AI agent that searches, evaluates and applies for jobs — then learns from the results.**
 >
