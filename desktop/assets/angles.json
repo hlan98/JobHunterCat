@@ -1,0 +1,236 @@
+{
+  "source": "f00bb64344fa2ff8273f032e87564385.mp4",
+  "fps": 12,
+  "frameCount": 84,
+  "width": 640,
+  "height": 640,
+  "alpha": {
+    "method": "edge-connected chroma matte",
+    "sourceHasAlpha": false
+  },
+  "ANGLE_KEYS": [
+    {
+      "angle": -180,
+      "frame": 56
+    },
+    {
+      "angle": -135,
+      "frame": 68
+    },
+    {
+      "angle": -100,
+      "frame": 9
+    },
+    {
+      "angle": -94,
+      "frame": 9
+    },
+    {
+      "angle": -86,
+      "frame": 9
+    },
+    {
+      "angle": -78,
+      "frame": 9
+    },
+    {
+      "angle": -45,
+      "frame": 20
+    },
+    {
+      "angle": 0,
+      "frame": 27
+    },
+    {
+      "angle": 45,
+      "frame": 34
+    },
+    {
+      "angle": 90,
+      "frame": 42
+    },
+    {
+      "angle": 135,
+      "frame": 50
+    },
+    {
+      "angle": 180,
+      "frame": 56
+    }
+  ],
+  "ANGLE_ANCHORS": [
+    {
+      "angle": -180,
+      "frame": 56,
+      "label": "left-profile"
+    },
+    {
+      "angle": -135,
+      "frame": 68,
+      "label": "upper-left"
+    },
+    {
+      "angle": -100,
+      "frame": 9,
+      "label": "upper-left-to-top"
+    },
+    {
+      "angle": -94,
+      "frame": 9,
+      "label": "top-stable-left"
+    },
+    {
+      "angle": -86,
+      "frame": 9,
+      "label": "top-stable-right"
+    },
+    {
+      "angle": -78,
+      "frame": 9,
+      "label": "top-to-upper-right"
+    },
+    {
+      "angle": -45,
+      "frame": 20,
+      "label": "upper-right"
+    },
+    {
+      "angle": 0,
+      "frame": 27,
+      "label": "right-facing"
+    },
+    {
+      "angle": 45,
+      "frame": 34,
+      "label": "lower-right"
+    },
+    {
+      "angle": 90,
+      "frame": 42,
+      "label": "downward"
+    },
+    {
+      "angle": 135,
+      "frame": 50,
+      "label": "lower-left"
+    },
+    {
+      "angle": 180,
+      "frame": 56,
+      "label": "left-profile"
+    }
+  ],
+  "angleKeys": [
+    {
+      "angle": -180,
+      "frame": 56
+    },
+    {
+      "angle": -135,
+      "frame": 68
+    },
+    {
+      "angle": -100,
+      "frame": 9
+    },
+    {
+      "angle": -94,
+      "frame": 9
+    },
+    {
+      "angle": -86,
+      "frame": 9
+    },
+    {
+      "angle": -78,
+      "frame": 9
+    },
+    {
+      "angle": -45,
+      "frame": 20
+    },
+    {
+      "angle": 0,
+      "frame": 27
+    },
+    {
+      "angle": 45,
+      "frame": 34
+    },
+    {
+      "angle": 90,
+      "frame": 42
+    },
+    {
+      "angle": 135,
+      "frame": 50
+    },
+    {
+      "angle": 180,
+      "frame": 56
+    }
+  ],
+  "angleAnchors": [
+    {
+      "angle": -180,
+      "frame": 56,
+      "label": "left-profile"
+    },
+    {
+      "angle": -135,
+      "frame": 68,
+      "label": "upper-left"
+    },
+    {
+      "angle": -100,
+      "frame": 9,
+      "label": "upper-left-to-top"
+    },
+    {
+      "angle": -94,
+      "frame": 9,
+      "label": "top-stable-left"
+    },
+    {
+      "angle": -86,
+      "frame": 9,
+      "label": "top-stable-right"
+    },
+    {
+      "angle": -78,
+      "frame": 9,
+      "label": "top-to-upper-right"
+    },
+    {
+      "angle": -45,
+      "frame": 20,
+      "label": "upper-right"
+    },
+    {
+      "angle": 0,
+      "frame": 27,
+      "label": "right-facing"
+    },
+    {
+      "angle": 45,
+      "frame": 34,
+      "label": "lower-right"
+    },
+    {
+      "angle": 90,
+      "frame": 42,
+      "label": "downward"
+    },
+    {
+      "angle": 135,
+      "frame": 50,
+      "label": "lower-left"
+    },
+    {
+      "angle": 180,
+      "frame": 56,
+      "label": "left-profile"
+    }
+  ],
+  "calibration": "Review contact_sheet.png and adjust frame indices if the source sequence is non-uniform."
+}

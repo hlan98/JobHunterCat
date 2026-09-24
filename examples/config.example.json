@@ -1,0 +1,68 @@
+{
+  "resume_path": "./resume.md",
+  "greeting": "您好，我对贵司岗位很感兴趣，期待进一步沟通。",
+  "skills": [
+    "Java",
+    "MySQL",
+    "Redis"
+  ],
+  "target_roles": [
+    "Java开发实习生"
+  ],
+  "exclude_keywords": [
+    "销售",
+    "包吃住",
+    "可带行李",
+    "带行李",
+    "日结",
+    "押金",
+    "先交费",
+    "无需经验",
+    "高薪诚聘",
+    "按天结算",
+    "按天计薪",
+    "按天",
+    "元/天",
+    "天结算",
+    "日薪",
+    "兼职"
+  ],
+  "min_score": 80,
+  "default_count": 20,
+  "default_mode": "rehearsal",
+  "platform_ports": {
+    "boss": 9222,
+    "sxs": 9223
+  },
+  "user_data_dirs": {
+    "boss": ".job_hunter/browser/boss",
+    "sxs": ".job_hunter/browser/sxs"
+  },
+  "scoring": {
+    "role_title_score": 30,
+    "skill_score_each": 5,
+    "skill_score_cap": 30,
+    "llm_score_min": 1,
+    "llm_score_max": 40,
+    "heuristic_base_score": 6,
+    "heuristic_skill_score_each": 4,
+    "heuristic_skill_score_cap": 20,
+    "heuristic_role_score": 8,
+    "heuristic_bonus_keywords": [
+      "ai",
+      "llm",
+      "模型",
+      "自动化",
+      "数据"
+    ],
+    "heuristic_bonus_score": 4
+  },
+  "llm": {
+    "base_url": "",
+    "api_key": "",
+    "model": "gpt-4o-mini",
+    "timeout": 60,
+    "temperature": 0.2,
+    "allow_resume_upload": false
+  }
+}

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>找工作喵 · 对话</title>
+<style>
+  :root{
+    --paper:#fff8f3; --cream:#fff0e6; --line:#f3d9c6; --ink:#3d2b20;
+    --muted:#9b8578; --coral:#ff8a65; --coral-dark:#f26b45;
+    --blue:#6fa8d6; --green:#7ec4a3; --amber:#f0b86e;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Quicksand','PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
+    background:linear-gradient(180deg,#fff5ee 0%,#fff8f3 100%); color:var(--ink);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    padding:12px 16px; background:linear-gradient(135deg,#ffe3d3,#fff0e6);
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; flex-shrink:0;
+  }
+  header .paw{font-size:18px;}
+  header .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);
+    box-shadow:0 0 0 3px rgba(255,138,101,.18);}
+  header .title{font-weight:800;font-size:15px; letter-spacing:.5px;}
+  header .state{font-size:11px;color:var(--muted);margin-left:auto;
+    background:#fff; padding:3px 10px; border-radius:999px; border:1px solid var(--line);}
+  #msgs{flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px;}
+  #msgs::-webkit-scrollbar{width:6px;}
+  #msgs::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+  .msg{max-width:86%; padding:10px 14px; border-radius:18px; font-size:13.5px; line-height:1.55;
+       white-space:pre-wrap; word-break:break-word; box-shadow:0 2px 6px rgba(180,120,80,.06);}
+  .msg.cat{align-self:flex-start; background:#fff; border:1px solid var(--line);
+    border-bottom-left-radius:6px;}
+  .msg.me{align-self:flex-end; background:linear-gradient(135deg,#ff9c7a,var(--coral)); color:#fff;
+    border-bottom-right-radius:6px; box-shadow:0 3px 10px rgba(255,138,101,.3);}
+  .msg.log{align-self:center; background:transparent; color:var(--muted); font-size:11px; padding:2px 6px;}
+  .msg.panel{align-self:stretch; background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px;}
+  .panel-title{font-size:13.5px; font-weight:700; margin-bottom:8px; color:var(--ink);}
+  .panel-opts{display:flex; flex-direction:column; gap:6px;}
+  .panel-opts button{
+    text-align:left; padding:9px 12px; border:1px solid var(--line); background:var(--cream);
+    border-radius:12px; cursor:pointer; font-size:13px; color:var(--ink); transition:all .15s;
+  }
+  .panel-opts button:hover{background:#ffe0cf; border-color:var(--coral); transform:translateX(2px);}
+  #quickbar{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line);
+    background:#fff5ee; flex-shrink:0;}
+  #quickbar button{
+    flex:1; padding:10px 12px; border:1.5px solid var(--line); background:#fff;
+    border-radius:999px; cursor:pointer; font-size:13px; font-weight:700; color:var(--ink);
+    transition:all .15s;
+  }
+  #quickbar button:hover{border-color:var(--coral); color:var(--coral); transform:translateY(-1px);}
+  #quickbar button.primary{background:linear-gradient(135deg,#ff9c7a,var(--coral)); color:#fff;
+    border-color:var(--coral); box-shadow:0 3px 10px rgba(255,138,101,.35);}
+  #quickbar button.primary:hover{background:var(--coral-dark); color:#fff;}
+  #quickbar button.stop-mode{background:linear-gradient(135deg,#e85d5d,#c0392b); color:#fff;
+    border-color:#c0392b; box-shadow:0 3px 10px rgba(192,57,43,.35);}
+  #quickbar button.stop-mode:hover{background:#a93226; color:#fff;}
+  #quickbar button:disabled, #quickbar button:disabled:hover {opacity:1; filter:none;}
+  #quickbar button:focus {outline:none;}
+  #composer{display:flex; gap:8px; padding:12px; border-top:1px solid var(--line);
+    background:#fff5ee; flex-shrink:0;}
+  #input{flex:1; padding:11px 14px; border:1.5px solid var(--line); border-radius:999px;
+         font-size:13.5px; background:#fff; outline:none; transition:border .15s;}
+  #input:focus{border-color:var(--coral); box-shadow:0 0 0 3px rgba(255,138,101,.15);}
+  #send{padding:11px 18px; border:0; border-radius:999px;
+    background:linear-gradient(135deg,#ff9c7a,var(--coral)); color:#fff;
+    font-size:13.5px; font-weight:700; cursor:pointer; box-shadow:0 3px 10px rgba(255,138,101,.3);
+    transition:transform .1s;}
+  #send:hover{transform:scale(1.04);}
+  #send:active{transform:scale(.97);}
+  body.dragover #drop-hint{display:flex;}
+  #drop-hint{display:none; position:fixed; inset:0; background:rgba(255,138,101,.15);
+    align-items:center; justify-content:center; z-index:9; pointer-events:none;
+    backdrop-filter:blur(2px);}
+  #drop-hint span{background:var(--coral); color:#fff; padding:14px 22px; border-radius:999px;
+    font-size:14px; font-weight:700; box-shadow:0 4px 14px rgba(0,0,0,.15);}
+
+  /* ===== 2026-09-21 TYPE2：思考中 ===== */
+  #typing{display:none; align-items:center; gap:6px; padding:2px 16px 8px;
+    font-size:11.5px; color:var(--muted); flex-shrink:0;}
+  #typing i{width:5px;height:5px;border-radius:50%;background:var(--coral);
+    animation:tdot 1.2s infinite ease-in-out;}
+  #typing i:nth-child(2){animation-delay:.15s;}
+  #typing i:nth-child(3){animation-delay:.3s;}
+  @keyframes tdot{0%,80%,100%{opacity:.25;transform:scale(.8);}40%{opacity:1;transform:scale(1.15);}}
+</style>
+</head>
+<body>
+  <header>
+    <div class="paw">🐾</div>
+    <div class="dot" id="dot"></div>
+    <div class="title">爬爬 · 找工作喵</div>
+    <div class="state" id="state">连接中…</div>
+  </header>
+  <div id="msgs"></div>
+  <!-- 2026-09-21 TYPE2：喵思考中（三个点动画） -->
+  <div id="typing" class="typing"><i></i><i></i><i></i><span id="typing-txt">思考中</span></div>
+  <div id="quickbar">
+    <button class="primary" id="btn-start" style="display:none;">▶ 开始投递</button>
+    <button id="btn-plan">📋 投递方案</button>
+  </div>
+  <div id="composer">
+    <input id="input" placeholder="和喵说点什么，或把简历文件拖进来…" autocomplete="off"/>
+    <button id="send">发送</button>
+  </div>
+  <div id="drop-hint"><span>松开，把这份简历交给喵</span></div>
+<script src="./chat.js"></script>
+</body>
+</html>

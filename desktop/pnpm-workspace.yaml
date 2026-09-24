@@ -1,0 +1,5 @@
+allowBuilds:
+  electron: true
+  esbuild: true
+  ffmpeg-static: true
+  sharp: true

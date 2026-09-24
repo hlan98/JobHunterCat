@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="funTitle funDesc">
+  <title id="funTitle">7 天真实使用漏斗：3,135 次扫描 → 141 次打招呼 → 14 份简历 → 13 家有回音</title>
+  <desc id="funDesc">7 天实测处置 3,135 次岗位扫描，其中打招呼 141 次（真实点击立即沟通），发送简历 14 份（HR 要简历后真实发送），13 家 HR 有回音（10 家回复 / 3 家拒绝，回复率约 9.2%）。上一轮的结果成为下一轮策略的输入。条形长度为示意，非等比例。</desc>
+  <defs>
+    <marker id="funArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1.6 L8.4 5 L2 8.4" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ln"/>
+    </marker>
+  </defs>
+  <style>
+    .bx { fill:#F6F8FA; stroke:#D0D7DE; stroke-width:1.5; }
+    .hl { fill:#E1F5EE; stroke:#1D9E75; stroke-width:1.5; }
+    .nm { fill:#1F2328; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:23px; font-weight:700; }
+    .tx { fill:#1F2328; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:16px; font-weight:500; }
+    .lb { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:14px; font-weight:400; }
+    .ft { fill:#8B949E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:12px; font-weight:400; }
+    .ln { stroke:#59636E; stroke-width:1.7; fill:none; }
+    @media (prefers-color-scheme: dark) {
+      .bx { fill:#21262D; stroke:#3D444D; }
+      .hl { fill:#12261F; stroke:#3FB950; }
+      .nm { fill:#E6EDF3; }
+      .tx { fill:#E6EDF3; }
+      .lb { fill:#9198A1; }
+      .ft { fill:#6E7681; }
+      .ln { stroke:#9198A1; }
+    }
+  </style>
+
+  <text class="ft" x="860" y="24" text-anchor="end" dominant-baseline="central">条形长度为示意，非等比例</text>
+
+  <rect class="bx" x="40" y="50" width="740" height="62" rx="10"/>
+  <text class="nm" x="150" y="81" text-anchor="end" dominant-baseline="central">3,135</text>
+  <text class="tx" x="170" y="81" dominant-baseline="central">次岗位扫描</text>
+
+  <rect class="bx" x="40" y="138" width="470" height="62" rx="10"/>
+  <text class="nm" x="150" y="169" text-anchor="end" dominant-baseline="central">141</text>
+  <text class="tx" x="170" y="169" dominant-baseline="central">次打招呼</text>
+  <text class="lb" x="532" y="169" dominant-baseline="central">真实点击「立即沟通」</text>
+
+  <rect class="bx" x="40" y="226" width="300" height="62" rx="10"/>
+  <text class="nm" x="150" y="257" text-anchor="end" dominant-baseline="central">14</text>
+  <text class="tx" x="170" y="257" dominant-baseline="central">份简历</text>
+  <text class="lb" x="362" y="257" dominant-baseline="central">HR 要简历后真实发送</text>
+
+  <rect class="bx" x="40" y="314" width="280" height="62" rx="10"/>
+  <text class="nm" x="150" y="345" text-anchor="end" dominant-baseline="central">13</text>
+  <text class="tx" x="170" y="345" dominant-baseline="central">家有回音</text>
+  <text class="lb" x="342" y="345" dominant-baseline="central">10 家回复 / 3 家拒绝 · 回复率约 9.2%</text>
+
+  <rect class="hl" x="40" y="416" width="820" height="62" rx="10"/>
+  <text class="tx" x="68" y="447" dominant-baseline="central">下一轮</text>
+  <text class="lb" x="140" y="447" dominant-baseline="central">上一轮的结果成为策略输入</text>
+
+  <path class="ln" d="M180 114 V134" marker-end="url(#funArrow)"/>
+  <path class="ln" d="M180 202 V222" marker-end="url(#funArrow)"/>
+  <path class="ln" d="M180 290 V310" marker-end="url(#funArrow)"/>
+  <path class="ln" d="M180 378 V412" marker-end="url(#funArrow)" stroke-dasharray="4 4"/>
+</svg>

@@ -1,0 +1,24 @@
+# 找工作喵 · Python 依赖
+# 2026-09-17 补全：原文件仅声明 windnd，缺少 Pillow 与 DrissionPage，
+# 按原文件建环境会导致 main.py 导入 PIL 失败。
+
+# 桌宠界面（main.py: from PIL import Image, ImageDraw, ImageTk）
+Pillow>=10.0.0
+
+# 拖拽导入简历（main.py: import windnd）
+windnd>=0.1.0
+
+# 浏览器自动化核心（job-hunter-skill 运行时依赖，原仅在 pyproject.toml 声明）
+DrissionPage>=4.1,<5
+
+# 图片简历本地 OCR（2026-09-21）。可选：未安装时图片简历会自动回落到视觉 LLM，
+# 两者都不可用时给出明确提示，不会再把「我没收到图片」这类话术当成简历正文。
+# 实测：1788x12630 的长图约 55 秒；普通一两页简历快得多。
+rapidocr-onnxruntime>=1.3.0
+
+# 简历解析：PDF 与 Word（2026-09-21 补全）
+# ⚠️ 这两个库一直在用（main.py: _extract_resume_text），却从未声明 ——
+#    本机因为环境里恰好有才没暴露；照 requirements 建环境会导致
+#    PDF / docx 简历解析直接 ImportError。PDF 是最常用的简历格式，必须声明。
+pymupdf>=1.23.0
+python-docx>=1.1.0

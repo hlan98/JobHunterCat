@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 366" role="img" aria-labelledby="fjmTitle fjmDesc">
+  <title id="fjmTitle">求职记忆闭环：从简历到下一轮策略</title>
+  <desc id="fjmDesc">简历 → 职业画像 → 求职策略 → 搜索岗位 → AI 匹配 → 投递 → HR / 面试结果 → Personal Job Memory → 下一轮求职策略，再回灌到求职策略，形成闭环。</desc>
+  <defs>
+    <marker id="fjmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1.6 L8.4 5 L2 8.4" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ln"/>
+    </marker>
+  </defs>
+  <style>
+    .bx { fill:#F6F8FA; stroke:#D0D7DE; stroke-width:1.5; }
+    .hl { fill:#E1F5EE; stroke:#1D9E75; stroke-width:1.5; }
+    .tx { fill:#1F2328; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:16px; font-weight:500; }
+    .lb { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:14px; font-weight:400; }
+    .ln { stroke:#59636E; stroke-width:1.7; fill:none; }
+    @media (prefers-color-scheme: dark) {
+      .bx { fill:#21262D; stroke:#3D444D; }
+      .hl { fill:#12261F; stroke:#3FB950; }
+      .tx { fill:#E6EDF3; }
+      .lb { fill:#9198A1; }
+      .ln { stroke:#9198A1; }
+    }
+  </style>
+
+  <rect class="bx" x="60" y="50" width="200" height="56" rx="10"/>
+  <text class="tx" x="160" y="78" text-anchor="middle" dominant-baseline="central">简历</text>
+
+  <rect class="bx" x="350" y="50" width="200" height="56" rx="10"/>
+  <text class="tx" x="450" y="78" text-anchor="middle" dominant-baseline="central">职业画像</text>
+
+  <rect class="bx" x="640" y="50" width="200" height="56" rx="10"/>
+  <text class="tx" x="740" y="78" text-anchor="middle" dominant-baseline="central">求职策略</text>
+
+  <rect class="bx" x="640" y="170" width="200" height="56" rx="10"/>
+  <text class="tx" x="740" y="198" text-anchor="middle" dominant-baseline="central">搜索岗位</text>
+
+  <rect class="bx" x="350" y="170" width="200" height="56" rx="10"/>
+  <text class="tx" x="450" y="198" text-anchor="middle" dominant-baseline="central">AI 匹配</text>
+
+  <rect class="bx" x="60" y="170" width="200" height="56" rx="10"/>
+  <text class="tx" x="160" y="198" text-anchor="middle" dominant-baseline="central">投递</text>
+
+  <rect class="bx" x="60" y="290" width="200" height="56" rx="10"/>
+  <text class="tx" x="160" y="318" text-anchor="middle" dominant-baseline="central">HR / 面试结果</text>
+
+  <rect class="hl" x="350" y="290" width="200" height="56" rx="10"/>
+  <text class="tx" x="450" y="318" text-anchor="middle" dominant-baseline="central">Personal Job Memory</text>
+
+  <rect class="hl" x="640" y="290" width="200" height="56" rx="10"/>
+  <text class="tx" x="740" y="318" text-anchor="middle" dominant-baseline="central">下一轮求职策略</text>
+
+  <path class="ln" d="M268 78 H342" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M558 78 H632" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M740 114 V162" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M632 198 H558" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M342 198 H268" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M160 234 V282" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M268 318 H342" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M558 318 H632" marker-end="url(#fjmArrow)"/>
+  <path class="ln" d="M840 318 H880 V78 H842" marker-end="url(#fjmArrow)"/>
+
+  <text class="lb" x="866" y="138" text-anchor="end" dominant-baseline="central">结果回灌下一轮</text>
+</svg>

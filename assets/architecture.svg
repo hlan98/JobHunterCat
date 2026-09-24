@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 568" role="img" aria-labelledby="archTitle archDesc">
+  <title id="archTitle">JobHunter Cat 架构分层</title>
+  <desc id="archDesc">桌面宠物（Electron）通过 stdout JSON 事件与 stdin JSON 命令连接 Python 内核 Agent Core；Agent Core 分支出 LLM Layer 与 Job Memory；Job Memory 下接 Strategy Loop（结果回灌下一轮策略），再下接 boss/ 平台层（DrissionPage 接管 CDP 9222）。</desc>
+  <defs>
+    <marker id="archArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1.6 L8.4 5 L2 8.4" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ln"/>
+    </marker>
+  </defs>
+  <style>
+    .bx { fill:#F6F8FA; stroke:#D0D7DE; stroke-width:1.5; }
+    .hl { fill:#E1F5EE; stroke:#1D9E75; stroke-width:1.5; }
+    .tx { fill:#1F2328; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:16px; font-weight:500; }
+    .sb { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:13px; font-weight:400; }
+    .ln { stroke:#59636E; stroke-width:1.7; fill:none; }
+    @media (prefers-color-scheme: dark) {
+      .bx { fill:#21262D; stroke:#3D444D; }
+      .hl { fill:#12261F; stroke:#3FB950; }
+      .tx { fill:#E6EDF3; }
+      .sb { fill:#9198A1; }
+      .ln { stroke:#9198A1; }
+    }
+  </style>
+
+  <rect class="bx" x="180" y="40" width="400" height="64" rx="10"/>
+  <text class="tx" x="380" y="64" text-anchor="middle" dominant-baseline="central">Desktop Pet · Electron</text>
+  <text class="sb" x="380" y="86" text-anchor="middle" dominant-baseline="central">爬爬，交互入口</text>
+
+  <rect class="bx" x="180" y="160" width="400" height="64" rx="10"/>
+  <text class="tx" x="380" y="184" text-anchor="middle" dominant-baseline="central">Agent Core (Python)</text>
+  <text class="sb" x="380" y="206" text-anchor="middle" dominant-baseline="central">编排 · 状态机 · 对话 · 控制</text>
+
+  <rect class="bx" x="120" y="268" width="240" height="64" rx="10"/>
+  <text class="tx" x="240" y="292" text-anchor="middle" dominant-baseline="central">LLM Layer</text>
+  <text class="sb" x="240" y="314" text-anchor="middle" dominant-baseline="central">任意 OpenAI 兼容端点</text>
+
+  <rect class="hl" x="400" y="268" width="240" height="64" rx="10"/>
+  <text class="tx" x="520" y="292" text-anchor="middle" dominant-baseline="central">Job Memory</text>
+  <text class="sb" x="520" y="314" text-anchor="middle" dominant-baseline="central">岗位记忆与关键词统计</text>
+
+  <rect class="bx" x="400" y="376" width="240" height="64" rx="10"/>
+  <text class="tx" x="520" y="400" text-anchor="middle" dominant-baseline="central">Strategy Loop</text>
+  <text class="sb" x="520" y="422" text-anchor="middle" dominant-baseline="central">结果 → 下一轮策略</text>
+
+  <rect class="bx" x="400" y="484" width="240" height="64" rx="10"/>
+  <text class="tx" x="520" y="508" text-anchor="middle" dominant-baseline="central">boss/ 平台层</text>
+  <text class="sb" x="520" y="530" text-anchor="middle" dominant-baseline="central">DrissionPage 接管 CDP 9222</text>
+
+  <path class="ln" d="M380 112 V152" marker-end="url(#archArrow)"/>
+  <text class="sb" x="394" y="124" dominant-baseline="central">stdout JSON 事件</text>
+  <text class="sb" x="394" y="142" dominant-baseline="central">stdin JSON 命令</text>
+
+  <path class="ln" d="M240 232 V260" marker-end="url(#archArrow)"/>
+  <path class="ln" d="M520 232 V260" marker-end="url(#archArrow)"/>
+  <path class="ln" d="M520 340 V368" marker-end="url(#archArrow)"/>
+  <path class="ln" d="M520 448 V476" marker-end="url(#archArrow)"/>
+</svg>

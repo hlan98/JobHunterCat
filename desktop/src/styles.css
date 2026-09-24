@@ -1,0 +1,35 @@
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+body { user-select: none; }
+#pet-stage { position: relative; width: 100vw; height: 100vh; cursor: grab; }
+#pet-stage.dragging { cursor: grabbing; }
+#pet { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; transform: none; pointer-events: none; -webkit-user-drag: none; }
+.preview-body { background: #edf2f6; }
+.preview-body #pet-stage { position: absolute; right: 24px; bottom: 24px; width: var(--preview-size, 320px); height: var(--preview-size, 320px); }
+.status { position: absolute; right: 10px; top: 10px; padding: 5px 8px; border-radius: 5px; background: rgba(22, 27, 34, .82); color: #f4f7fb; font: 12px/1.2 "Segoe UI", sans-serif; opacity: 0; transition: opacity .18s ease; pointer-events: none; }
+.status.visible { opacity: 1; }
+
+/* 状态指示灯（小圆点 + 紧凑标签，不挡猫头） */
+.bubble{
+  position:absolute; left:50%; top:6px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:6px;
+  padding:6px 12px 6px 9px;
+  background:linear-gradient(135deg,#fff5ee,#ffe8d8); color:#5a3a2a;
+  border:1.5px solid #ffcfa8;
+  border-radius:999px; font-size:11.5px; font-weight:600; line-height:1.2;
+  box-shadow:0 3px 10px rgba(255,150,100,.25), inset 0 1px 0 #fff;
+  opacity:0; pointer-events:none;
+  transition:opacity .25s, transform .25s; white-space:nowrap; max-width:240px;
+  font-family:'Quicksand','PingFang SC','Microsoft YaHei',sans-serif;
+}
+.bubble.visible{opacity:1; transform:translateX(-50%) translateY(0);}
+.bubble::before{
+  content:''; width:8px; height:8px; border-radius:50%;
+  background:var(--dot,#999); flex:0 0 auto;
+  box-shadow:0 0 0 2.5px rgba(255,255,255,.7), 0 0 8px var(--dot,#999);
+}
+.bubble::after{
+  content:''; position:absolute; left:50%; bottom:-7px; margin-left:-5px;
+  width:10px; height:10px; background:#ffe8d8;
+  border-right:1.5px solid #ffcfa8; border-bottom:1.5px solid #ffcfa8;
+  transform:rotate(45deg);
+}

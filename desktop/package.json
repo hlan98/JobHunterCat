@@ -1,0 +1,24 @@
+{
+  "name": "video-cat-desktop-pet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Transparent Windows Electron desktop pet driven by global cursor position",
+  "main": "src/main.js",
+  "scripts": {
+    "assets": "node tools/build-assets.js",
+    "preview": "vite --host 127.0.0.1",
+    "start": "electron .",
+    "verify": "node tools/verify-assets.js"
+  },
+  "dependencies": {
+    "electron": "^38.0.0",
+    "ffmpeg-static": "^5.2.0",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "vite": "^7.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

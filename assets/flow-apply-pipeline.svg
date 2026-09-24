@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 1030" role="img" aria-labelledby="pipeTitle pipeDesc">
+  <title id="pipeTitle">投递主流程：前置门禁 → 关键词循环 → 停止总结 → 回灌下一轮</title>
+  <desc id="pipeDesc">cmd: start 之后依次通过三道前置：_ensure_browser() 拉起或接管 CDP 9222，_ensure_login() 门禁 B 等待扫码登录，_ensure_resume_choice() 门禁 C 等待选择在线附件简历。随后进入 for kw in keywords 循环，每个关键词跑一遍：收集（每个关键词最多 35 个）→ 卡片级预过滤（标题 / 薪资 / 屏蔽词）→ 评分（规则分 + LLM 补分，两周去重）→ 达标后打招呼并记账本 → 每轮关键词扫完跑一轮 HR 监听（识别四类信号）。循环结束后停止总结（LLM 总结本轮 + 关键词有效性判断），最后折叠进 job_memory 并回灌下一轮方案。</desc>
+  <defs>
+    <marker id="pipeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1.6 L8.4 5 L2 8.4" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ln"/>
+    </marker>
+  </defs>
+  <style>
+    .bx { fill:#F6F8FA; stroke:#D0D7DE; stroke-width:1.5; }
+    .hl { fill:#E1F5EE; stroke:#1D9E75; stroke-width:1.5; }
+    .ct { fill:none; stroke:#AFB8C1; stroke-width:1.5; stroke-dasharray:7 5; }
+    .bg { fill:#FFF8E5; stroke:#D4A72C; stroke-width:1; }
+    .bgt { fill:#7D4E00; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:12px; font-weight:600; }
+    .tx { fill:#1F2328; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:16px; font-weight:500; }
+    .sb { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:13px; font-weight:400; }
+    .lb { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:13px; font-weight:400; }
+    .hd { fill:#59636E; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; font-size:14px; font-weight:600; }
+    .ln { stroke:#59636E; stroke-width:1.7; fill:none; }
+    @media (prefers-color-scheme: dark) {
+      .bx { fill:#21262D; stroke:#3D444D; }
+      .hl { fill:#12261F; stroke:#3FB950; }
+      .ct { stroke:#545D68; }
+      .bg { fill:#2E2410; stroke:#D4A72C; }
+      .bgt { fill:#E3B341; }
+      .tx { fill:#E6EDF3; }
+      .sb { fill:#9198A1; }
+      .lb { fill:#9198A1; }
+      .hd { fill:#9198A1; }
+      .ln { stroke:#9198A1; }
+    }
+  </style>
+
+  <!-- ① 入口 -->
+  <rect class="bx" x="120" y="48" width="680" height="54" rx="10"/>
+  <text class="tx" x="144" y="75" dominant-baseline="central">cmd: start</text>
+
+  <!-- ② _ensure_browser -->
+  <rect class="bx" x="120" y="126" width="680" height="62" rx="10"/>
+  <text class="tx" x="144" y="150" dominant-baseline="central">_ensure_browser()</text>
+  <text class="sb" x="144" y="172" dominant-baseline="central">拉起 / 接管 9222（带登录态目录）</text>
+
+  <!-- ③ _ensure_login -->
+  <rect class="bx" x="120" y="212" width="680" height="62" rx="10"/>
+  <text class="tx" x="144" y="236" dominant-baseline="central">_ensure_login()</text>
+  <text class="sb" x="144" y="258" dominant-baseline="central">未登录 → 打开登录页 → 等你扫码 → 重检</text>
+  <rect class="bg" x="690" y="230" width="86" height="26" rx="13"/>
+  <text class="bgt" x="733" y="243" text-anchor="middle" dominant-baseline="central">门禁 B</text>
+
+  <!-- ④ _ensure_resume_choice -->
+  <rect class="bx" x="120" y="298" width="680" height="62" rx="10"/>
+  <text class="tx" x="144" y="322" dominant-baseline="central">_ensure_resume_choice()</text>
+  <text class="sb" x="144" y="344" dominant-baseline="central">等你选在线附件简历（未选完停止）</text>
+  <rect class="bg" x="690" y="316" width="86" height="26" rx="13"/>
+  <text class="bgt" x="733" y="329" text-anchor="middle" dominant-baseline="central">门禁 C</text>
+
+  <!-- ⑤ 关键词循环容器 -->
+  <rect class="ct" x="84" y="382" width="792" height="436" rx="14"/>
+  <text class="hd" x="108" y="404" dominant-baseline="central">for kw in keywords · 每个关键词跑一遍</text>
+  <text class="lb" x="852" y="404" text-anchor="end" dominant-baseline="central">↻ 取下一个关键词</text>
+
+  <rect class="bx" x="160" y="430" width="600" height="56" rx="10"/>
+  <text class="tx" x="184" y="458" dominant-baseline="central">收集（每个关键词最多 35 个）</text>
+
+  <rect class="bx" x="160" y="508" width="600" height="56" rx="10"/>
+  <text class="tx" x="184" y="536" dominant-baseline="central">卡片级预过滤（标题 / 薪资 / 屏蔽词）</text>
+
+  <rect class="bx" x="160" y="586" width="600" height="56" rx="10"/>
+  <text class="tx" x="184" y="614" dominant-baseline="central">评分（规则分 + LLM 补分 · 两周去重）</text>
+
+  <rect class="bx" x="160" y="664" width="600" height="56" rx="10"/>
+  <text class="tx" x="184" y="692" dominant-baseline="central">达标 → 打招呼 → 记账本</text>
+
+  <rect class="bx" x="160" y="742" width="600" height="56" rx="10"/>
+  <text class="tx" x="184" y="770" dominant-baseline="central">每轮关键词扫完 → 跑一轮 HR 监听（识别四类信号）</text>
+
+  <!-- ⑥ 收尾 -->
+  <rect class="bx" x="120" y="842" width="680" height="62" rx="10"/>
+  <text class="tx" x="144" y="866" dominant-baseline="central">停止总结</text>
+  <text class="sb" x="144" y="888" dominant-baseline="central">LLM 总结本轮 + 关键词有效性判断</text>
+
+  <rect class="hl" x="120" y="928" width="680" height="62" rx="10"/>
+  <text class="tx" x="144" y="952" dominant-baseline="central">折叠进 job_memory</text>
+  <text class="sb" x="144" y="974" dominant-baseline="central">回灌下一轮方案</text>
+
+  <!-- 箭头：主干 -->
+  <path class="ln" d="M460 102 V122" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 188 V208" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 274 V294" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 360 V378" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 798 V838" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 904 V924" marker-end="url(#pipeArrow)"/>
+
+  <!-- 箭头：循环体内 -->
+  <path class="ln" d="M460 486 V504" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 564 V582" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 642 V660" marker-end="url(#pipeArrow)"/>
+  <path class="ln" d="M460 720 V738" marker-end="url(#pipeArrow)"/>
+
+  <!-- 箭头：循环回边 -->
+  <path class="ln" d="M760 770 H838 V458 H764" marker-end="url(#pipeArrow)"/>
+</svg>

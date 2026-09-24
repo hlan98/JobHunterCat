@@ -1,0 +1,14 @@
+{
+  "source": "start.mp4",
+  "state": "work_start",
+  "fps": 20,
+  "frameCount": 57,
+  "width": 640,
+  "height": 640,
+  "contentScale": 1,
+  "mode": "loop",
+  "alpha": {
+    "method": "edge-connected chroma matte + dark-adjacency cleanup",
+    "sourceHasAlpha": false
+  }
+}

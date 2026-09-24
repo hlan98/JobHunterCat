@@ -1,0 +1,13 @@
+{
+  "target_city": "广州",
+  "target_roles": ["<关键词1>", "<关键词2>"],
+  "min_score": 70,
+  "min_salary_low_k": 15,
+  "min_salary_high_k": 25,
+  "resume_send_name": "<你在 BOSS 上已上传的附件简历文件名>",
+  "llm": {
+    "base_url": "<OpenAI 兼容端点>",
+    "model": "<模型名>",
+    "api_key": "<你的密钥 —— 不要提交这个文件>"
+  }
+}

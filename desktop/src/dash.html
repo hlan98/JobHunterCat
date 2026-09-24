@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>找工作喵 · 看板</title>
+<style>
+:root{
+  --ink:#272623; --muted:#7b776f; --line:#e6e0d7; --paper:#fbfaf7; --panel:#fff;
+  --cream:#f5f0e9; --coral:#d86f4e; --coral-dark:#b9573b; --blue:#477ba8;
+  --green:#4d9272; --amber:#b8823c; --red:#bd5a58;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(--paper); color:var(--ink); height:100vh; overflow:hidden;}
+.app{display:flex; height:100vh;}
+.sidebar{width:216px; padding:24px 14px 18px; border-right:1px solid var(--line); background:#f7f3ed; display:flex; flex-direction:column; flex-shrink:0;}
+.brand{display:flex; align-items:center; gap:10px; padding:0 9px 24px;}
+.brand .mark{width:36px;height:36px;border-radius:12px;background:#f5b18c;display:grid;place-items:center;font-size:20px;}
+.brand .name{font-size:15px;font-weight:800;}
+.brand .ver{font-size:10px;color:var(--muted);}
+.nav{display:flex; flex-direction:column; gap:4px; flex:1;}
+.nav button{display:flex;align-items:center;gap:10px;border:0;border-radius:8px;padding:10px 11px;background:transparent;font-size:13px;color:var(--ink);cursor:pointer;text-align:left;}
+.nav button:hover{background:#efe8dd;}
+.nav button.active{background:var(--coral);color:#fff;}
+.cards{flex:1; padding:24px; overflow-y:auto;}
+.page{display:none;}
+.page.active{display:block;}
+.page h2{font-size:18px; margin-bottom:16px;}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px;}
+.card .label{font-size:11px; color:var(--muted); margin-bottom:6px;}
+.card .value{font-size:22px; font-weight:800;}
+.edit-num{margin-top:0;width:68px;padding:5px 8px;border:1.5px solid #e8c4a8;border-radius:8px;font-size:16px;font-weight:700;background:#fff;text-align:center;transition:border-color .15s;}
+.edit-num:focus{outline:none;border-color:var(--coral);}
+.edit-text{margin-top:0;width:100px;padding:5px 10px;border:1.5px solid #e8c4a8;border-radius:8px;font-size:14px;font-weight:600;background:#fff;transition:border-color .15s;}
+.edit-text:focus{outline:none;border-color:var(--coral);}
+.btn{border:0;border-radius:10px;padding:10px 16px;font-size:13px;cursor:pointer;font-weight:600;}
+.btn-primary{background:var(--coral);color:#fff;}
+.btn-warn{background:var(--amber);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-ghost{background:var(--cream);color:var(--ink);border:1px solid var(--line);}
+.row{display:flex; gap:10px; flex-wrap:wrap; margin:14px 0;}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.chip{background:var(--cream);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;}
+.logbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;height:360px;overflow-y:auto;font-size:12px;line-height:1.6;color:var(--muted);white-space:pre-wrap;font-family:Consolas,monospace;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+.field input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;outline:none;}
+.field input:focus{border-color:var(--coral);}
+.tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;}
+.tag-green{background:#e3efe8;color:var(--green);}
+.tag-red{background:#f4e0df;color:var(--red);}
+.tag-blue{background:#e2ebf3;color:var(--blue);}
+.tag-amber{background:#f4ead8;color:var(--amber);}
+.kw{font-size:13px;line-height:1.8;}
+/* 2026-09-18 复盘报告表格：加分隔线与内边距，避免挤在一起 */
+.rpt{width:100%;font-size:12.5px;border-collapse:collapse;margin-top:6px;}
+.rpt th{padding:8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:2px solid var(--line);white-space:nowrap;}
+.rpt td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5;}
+.rpt tr:last-child td{border-bottom:0;}
+.rpt .num{text-align:right;font-variant-numeric:tabular-nums;}
+.rpt .dim{color:var(--muted);}
+.rpt .sc-ok{color:var(--green);font-weight:600;}
+.rpt .sc-near{color:var(--amber);font-weight:600;}
+.rpt .sc-low{color:var(--muted);font-weight:600;}
+.rpt-wrap{margin-top:14px;}
+/* 2026-09-19 L：报告详情的「小节」容器 —— 三块内容明确分区 */
+.rpt-sec{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);}
+.rpt-sec-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.rpt-sec-bar{width:3px;height:14px;border-radius:2px;background:var(--coral);flex:none;}
+.rpt-sec-t{font-size:13px;font-weight:500;color:var(--text);}
+.rpt-sec-sub{font-size:12px;color:var(--muted);margin-left:auto;}
+.rpt-stat{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;margin-top:4px;}
+.rpt-stat b{font-weight:500;}
+
+/* ============ 2026-09-21 总览分区（保持原配色） ============ */
+.blk{margin-bottom:18px;}
+.blk-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:6px 12px;
+  background:var(--cream);border-radius:10px;border-left:3px solid var(--coral);}
+.blk-hd .ic{font-size:13px;}
+.blk-hd .tx{font-size:12px;font-weight:700;letter-spacing:.3px;}
+.blk-hd .hint{margin-left:auto;font-size:11px;color:var(--muted);}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+/* 数据卡：与原 .card 完全一致的观感 */
+.dcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;}
+.dcard .lb{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.dcard .vl{font-size:22px;font-weight:800;}
+/* 可编辑区：沿用本文件原有的「暖底 + 虚线 + ✎」观感，整块圈起来以强化"这里能改" */
+.blk.edit{background:#fdf6ef;border:1px dashed #e8c4a8;border-radius:14px;padding:12px 14px 14px;}
+.blk.edit .blk-hd{background:transparent;border-left-color:#d8a070;padding-left:2px;margin-bottom:8px;}
+.icard{background:#fff;border:1.5px dashed #e8c4a8;border-radius:14px;padding:12px 16px 14px;position:relative;}
+.icard::after{content:'✎';position:absolute;top:9px;right:11px;font-size:10px;color:#d8a070;opacity:.6;}
+.icard .lb{font-size:11px;color:#a8784f;margin-bottom:8px;}
+.kwbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;}
+
+/* ============ 2026-09-21 PROG2：投递进度条 ============ */
+.pg-wrap{height:10px;background:var(--cream);border:1px solid var(--line);
+  border-radius:999px;overflow:hidden;margin:6px 0 8px;}
+.pg-bar{height:100%;width:0%;border-radius:999px;
+  background:linear-gradient(90deg,#f0a76b,var(--coral));transition:width .4s ease;}
+.pg-row{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}
+.pg-pct{font-size:20px;font-weight:800;}
+.pg-hint{font-size:11.5px;color:var(--muted);}
+.pg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.pg-cell{background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center;}
+.pg-cell .pg-k{font-size:11px;color:var(--muted);}
+.pg-cell .pg-v{font-size:18px;font-weight:800;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">🐱</div><div><div class="name">找工作喵</div><div class="ver">v8 · Electron</div></div></div>
+    <nav class="nav">
+      <button data-page="overview" class="active">🏠 总览</button>
+      <button data-page="run">▶ 运行中</button>
+      <button data-page="inbox">📥 待处理</button>
+      <button data-page="insights">📊 分析报告</button>
+      <button data-page="settings">⚙ 设置</button>
+    </nav>
+  </aside>
+
+  <main class="cards">
+    <!-- 总览 -->
+    <section class="page active" id="page-overview">
+      <h2>🏠 总览</h2>
+
+      <div class="blk">
+        <div class="blk-hd"><span class="ic">📊</span><span class="tx">数据一览</span><span class="hint">只读 · 自动统计</span></div>
+        <div class="g">
+          <div class="dcard"><div class="lb">累计打招呼</div><div class="vl" id="ov-greet">0</div></div>
+          <div class="dcard"><div class="lb">累计发简历</div><div class="vl" id="ov-resume">0</div></div>
+          <div class="dcard"><div class="lb">累计跳过</div><div class="vl" id="ov-skip">0</div></div>
+          <div class="dcard"><div class="lb">累计失败</div><div class="vl" id="ov-fail">0</div></div>
+          <div class="dcard"><div class="lb">当前状态</div><div class="vl" id="ov-state">—</div></div>
+          <div class="dcard"><div class="lb">关键词数</div><div class="vl" id="ov-kw">—</div></div>
+        </div>
+      </div>
+
+      <div class="blk edit">
+        <div class="blk-hd"><span class="ic">✎</span><span class="tx">方案配置</span><span class="hint">可直接修改</span></div>
+        <div class="g">
+          <div class="icard"><div class="lb">岗位匹配值</div>
+            <input id="ov-score" type="number" placeholder="70" class="edit-num">
+          </div>
+          <div class="icard"><div class="lb">期望薪资（K）</div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <input id="ov-sallow" type="number" placeholder="20" class="edit-num">
+              <span style="color:var(--muted);">—</span>
+              <input id="ov-salhigh" type="number" placeholder="25" class="edit-num">
+            </div>
+          </div>
+          <div class="icard"><div class="lb">城市</div>
+            <input id="ov-city" placeholder="广州" class="edit-text">
+          </div>
+          <div class="icard" style="grid-column:1/-1;">
+            <div class="lb">屏蔽词（命中岗位/JD/薪资即关闭；逗号或顿号分隔）</div>
+            <input id="ov-exclude" placeholder="日结、电商、Tiktok" class="edit-text" style="width:100%;">
+          </div>
+          <div class="icard" style="grid-column:1/-1;">
+            <div class="lb">投递关键词（逗号分隔）</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="edit-kw" style="flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;outline:none;">
+              <button class="btn btn-primary" onclick="savePlan()">💾 保存</button>
+            </div>
+          </div>
+        </div>
+        <span id="plan-save-status" style="margin-left:2px;font-size:12px;"></span>
+      </div>
+
+      <div class="blk">
+        <div class="blk-hd"><span class="ic">🎯</span><span class="tx">当前关键词</span><span class="hint">来自当前方案</span></div>
+        <div class="kwbox">
+          <div class="chips" id="ov-kwlist"><span style="color:var(--muted);font-size:12px;">暂无方案，先上传简历</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 运行中 -->
+    <section class="page" id="page-run">
+      <h2>运行中</h2>
+      <!-- 2026-09-21 PROG2：进度条（数据来自后端的 progress 事件） -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="label">本次投递进度</div>
+        <div class="pg-wrap"><div class="pg-bar" id="pg-bar"></div></div>
+        <div class="pg-row">
+          <span class="pg-pct" id="pg-pct">0%</span>
+          <span class="pg-hint" id="pg-text">尚未开始投递</span>
+        </div>
+        <div class="pg-grid">
+          <div class="pg-cell"><div class="pg-k">扫了</div><div class="pg-v" id="pg-scan">0</div></div>
+          <div class="pg-cell"><div class="pg-k">跳过</div><div class="pg-v" id="pg-skip">0</div></div>
+          <div class="pg-cell"><div class="pg-k">投了</div><div class="pg-v" id="pg-apply">0</div></div>
+          <div class="pg-cell"><div class="pg-k">关键词</div><div class="pg-v" id="pg-kw">0/0</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="label">投放明细</div>
+        <div class="logbox" id="run-log">等待投递…</div>
+      </div>
+    </section>
+
+    <!-- 待处理 -->
+    <section class="page" id="page-inbox">
+      <h2>待处理（HR 消息）</h2>
+      <div id="inbox-list"><p style="font-size:13px;color:var(--muted);">暂无 HR 消息。</p></div>
+    </section>
+
+    <!-- 分析报告 -->
+    <section class="page" id="page-insights">
+      <h2>分析报告</h2>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <div class="label">投递报告（最近 30 次保留岗位明细，更早的只留摘要）</div>
+          <button class="btn btn-ghost" style="flex:none;" onclick="clearReports()">🗑 清除报告结果</button>
+          <button class="btn btn-ghost" style="flex:none;" onclick="exportDelivery()">📤 导出投递数据</button>
+        </div>
+        <div id="hr-inbound" style="display:none;"></div>
+        <!-- 2026-09-22 KWFB1：关键词 · HR 真实反馈（只读展示） -->
+        <div id="kw-feedback" style="display:none;"></div>
+        <!-- 2026-09-22 STARTUP-DIAG：打开即诊断（只读展示） -->
+        <div id="startup-diagnosis" style="display:none;"></div>
+        <div id="reports-list" style="margin-top:8px;"></div>
+      </div>
+      <div class="card" id="report-detail" style="display:none;max-height:60vh;overflow:auto;"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="page" id="page-settings">
+      <h2>设置 · LLM</h2>
+      <div class="card" style="max-width:520px;">
+        <div class="field"><label>Base URL</label><input id="llm-url" placeholder="例如 https://api.openai.com/v1"></div>
+        <div class="field"><label>API Key</label><input id="llm-key" type="password" placeholder="sk-..."></div>
+        <div class="field"><label>Model</label><input id="llm-model" placeholder="拉取后从下方列表点选"></div>
+        <div class="row">
+          <button class="btn btn-ghost" onclick="fetchModels()">🔄 拉取模型</button>
+          <button class="btn btn-primary" onclick="saveLlm()">💾 保存</button>
+        </div>
+        <div class="chips" id="llm-models"></div>
+        <div id="llm-status" style="margin-top:10px;font-size:12px;"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+const logs = [];
+const hrMsgs = [];
+function act(o){ window.bridge.send(o); }
+function go(p){
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.page===p));
+  document.querySelectorAll('.page').forEach(s=>s.classList.toggle('active', s.id==='page-'+p));
+}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
+  go(b.dataset.page);
+  if(b.dataset.page==='insights') loadReports();   // 2026-09-18 复盘报告
+});
+
+function addLog(t){
+  logs.push(t); if(logs.length>300) logs.shift();
+  const el=document.getElementById('run-log'); el.textContent=logs.join('\n'); el.scrollTop=el.scrollHeight;
+}
+function renderInbox(){
+  const el = document.getElementById('inbox-list');
+  if(!el) return;
+  if(!hrMsgs.length){ el.innerHTML = '<p style="font-size:13px;color:var(--muted);">暂无 HR 消息。</p>'; return; }
+  el.innerHTML = hrMsgs.slice().reverse().map(m=>{
+    const title = (m.hr_name? '👤 '+m.hr_name : 'HR') + (m.company? ' · '+m.company : '');
+    const time = m.time ? '<span style="color:var(--muted);font-size:11px;margin-left:8px;">'+m.time+'</span>' : '';
+    return '<div class="card" style="margin-bottom:8px;padding:12px;">'
+      + '<div style="font-size:13px;font-weight:700;">'+title+time+'</div>'
+      + '<div style="font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;">'+(m.message||'')+'</div>'
+      + '<div style="margin-top:6px;"><span class="tag tag-amber">⚠ 喵未自动回复</span></div>'
+      + '</div>';
+  }).join('');
+}
+
+// ===== 2026-09-18 复盘报告 =====
+function escH(s){
+  return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+  });
+}
+function loadReports(){
+  act({cmd:"call", action:"reports"});
+  // 2026-09-22 KWFB1：顺带拉「关键词 · HR 真实反馈」（只读，不进决策）
+  act({cmd:"call", action:"kw_feedback"});
+  // 2026-09-22 KWFB1：同时补上 hr_inbound 的拉取 ——
+  // loadInbound() 原来**定义了却从未被调用**，「HR 主动联系」卡片一直不显示。
+  act({cmd:"call", action:"hr_inbound"});
+  // 2026-09-22 STARTUP-DIAG：打开诊断结果（只读）
+  act({cmd:"call", action:"startup_diagnosis"});
+}
+var curRunId = "";   // 2026-09-19 Q1：记住当前打开的报告，供状态更新时重拉
+function openReport(id){ curRunId=id; act({cmd:"call", action:"report_detail", run_id:id}); }
+// 2026-09-19 S：非方案来源的来话（用户自己打招呼 / HR 主动）—— 只提醒，不进统计。
+// ⚠️ 限高 + 滚动条：不能让它把报告详情挤到下面去。
+function loadInbound(){ act({cmd:"call", action:"hr_inbound"}); }
+// 2026-09-22 KWFB1：关键词 · HR 真实反馈（只读展示）。
+// 「有效回复」= 回复 + 发简历 + 面试邀请；比率经小样本收缩，样本不足仅供参考。
+function renderKwFeedback(list){
+  const el=document.getElementById("kw-feedback"); if(!el) return;
+  const rows=(list||[]).slice();
+  if(!rows.length){ el.style.display="none"; el.innerHTML=""; return; }
+  el.style.display="block";
+  let h='<div class="card" style="margin-bottom:12px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+    +'<div class="label">关键词 · HR 真实反馈</div>'
+    +'<span style="font-size:11.5px;color:var(--muted);">只读展示 · 不影响关键词与阈值</span></div>'
+    +'<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">'
+    +'有效回复 = 回复+发简历+面试邀请；回复率经小样本收缩，投放不足 5 次的仅供参考</div>'
+    +'<div style="max-height:240px;overflow-y:auto;margin-top:8px;">'
+    +'<table class="rpt"><tr><th>关键词</th><th>投放</th><th>有效回复</th><th>拒绝</th><th>待定</th><th>回复率</th></tr>';
+  rows.forEach(function(x){
+    const rate=(x.applied? ((x.rate_shrunk||0)*100).toFixed(0)+'%' : '—');
+    h+="<tr>"
+      +"<td>"+escH(x.kw||"")+"</td>"
+      +"<td>"+(x.applied||0)+"</td>"
+      +"<td>"+(x.positive||0)+"</td>"
+      +"<td>"+(x.rejected||0)+"</td>"
+      +"<td>"+(x.pending||0)+"</td>"
+      +"<td>"+rate+(x.enough?"":' <span style="color:var(--muted);font-size:11px;">样本不足</span>')+"</td>"
+      +"</tr>";
+  });
+  h+="</table></div></div>";
+  el.innerHTML=h;
+}
+function renderStartupDiagnosis(msg){
+  const el=document.getElementById("startup-diagnosis"); if(!el) return;
+  const diag=(msg&&msg.diagnosis)||"";
+  const ts=(msg&&msg.ts)||"";
+  if(!diag){ el.style.display="none"; el.innerHTML=""; return; }
+  el.style.display="block";
+  let h='<div class="card" style="margin-bottom:12px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+    +'<div class="label">📋 打开诊断与建议</div>'
+    +'<span style="font-size:11.5px;color:var(--muted);">基于历史投放数据 · 仅供参考</span></div>'
+    +'<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">生成时间：'+escH(ts)+'</div>'
+    +'<div style="white-space:pre-wrap;line-height:1.7;margin-top:10px;font-size:13px;">'+escH(diag).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')+'</div>'
+    +'</div>';
+  el.innerHTML=h;
+}
+function renderInbound(list){
+  const el=document.getElementById("hr-inbound"); if(!el) return;
+  const items=(list||[]).slice(0,20);
+  if(!items.length){ el.style.display="none"; el.innerHTML=""; return; }
+  el.style.display="block";
+  const total=(list||[]).length;
+  let h='<div class="card" style="margin-bottom:12px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+    +'<div class="label">HR 主动联系</div>'
+    +'<span style="font-size:11.5px;color:var(--muted);">共 '+total+' 条 · 不进结果统计</span></div>'
+    // 固定高度 + 滚动：条目再多也不撑开页面
+    +'<div style="max-height:200px;overflow-y:auto;margin-top:8px;">'
+    +'<table class="rpt"><tr><th>公司</th><th>HR</th><th>最新消息</th><th>状态</th></tr>';
+  items.forEach(function(x){
+    const st=x.state||"replied";
+    const col = st==="interview" ? "var(--green)"
+              : (st==="rejected" ? "var(--red)" : "var(--amber)");
+    h+="<tr>"
+      +"<td style=\"max-width:130px;\">"+escH(x.company||"—")+"</td>"
+      +"<td>"+escH(x.hr_name||"—")+"</td>"
+      +"<td class=\"dim\" style=\"max-width:240px;\">"+escH(x.last_msg||"")+"</td>"
+      +"<td><b style=\"color:"+col+";\">"+escH(x.state_label||st)+"</b></td>"
+      +"</tr>";
+  });
+  h+="</table></div></div>";
+  el.innerHTML=h;
+}
+function renderReports(list){
+  const el=document.getElementById("reports-list"); if(!el) return;
+  if(!list || !list.length){
+    el.innerHTML='<p style="font-size:13px;color:var(--muted);">暂无报告。'
+      +'跑完一轮、且有岗位拿到 LLM 评分后会自动生成；'
+      +'中途停止（没评上分）的轮次不计入。</p>';
+    return;
+  }
+  el.innerHTML = list.map(function(r){
+    const tag = r.reason==="user_stop"
+      ? '<span class="tag tag-amber">用户停止</span>'
+      : '<span class="tag tag-green">自然完成</span>';
+    const trim = r.trimmed ? '<span class="tag" style="opacity:.6;">仅摘要</span>' : "";
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer;"'
+      + ' onclick="openReport(\''+r.run_id+'\')">'
+      + tag + trim
+      + ' <span style="font-weight:600;margin-left:6px;">'+escH(r.ts)+'</span>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">'
+      + "扫 "+r.scanned+" · 达 "+r.applied+" · 均 "+r.avg+" · 最高 "+r.top
+      + " · 岗位明细 "+r.jobs+" 条</div></div>";
+  }).join("");
+}
+function renderReportDetail(d){
+  const el=document.getElementById("report-detail"); if(!el) return;
+  if(!d){ el.style.display="block";
+    el.innerHTML='<p style="font-size:13px;color:var(--muted);">报告读取失败。</p>';
+    return; }
+  const s=d.summary||{}, adv=s.advice||{};
+  let h='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+    + '<div class="label">'+escH(d.ts)+" · "
+    + (d.reason==="user_stop"?"用户停止":"自然完成")+"</div>"
+    + '<button class="btn btn-ghost" onclick="document.getElementById(\'report-detail\').style.display=\'none\'">关闭</button></div>';
+  // 2026-09-19 L：概览独立成小节，四个数字平铺一行（比挤在一句里好读）
+  h+='<div class="rpt-sec" style="border-top:0;padding-top:0;margin-top:12px;">'
+    +'<div class="rpt-sec-h"><span class="rpt-sec-bar"></span>'
+    +'<span class="rpt-sec-t">本轮概览</span></div>'
+    +'<div class="rpt-stat">'
+      +'<span>扫描 <b>'+(s.scanned||0)+'</b></span>'
+      +'<span>达标 <b>'+(s.applied||0)+'</b></span>'
+      +'<span>均分 <b>'+(s.avg||0)+'</b></span>'
+      +'<span>最高 <b>'+(s.top||0)+'</b></span>'
+    +'</div>';
+  if(adv.text){ h+='<div style="font-size:12.5px;color:var(--muted);'
+    +'margin-top:8px;line-height:1.6;">'+escH(adv.text)+"</div>"; }
+  h+="</div>";
+  const kws=s.by_keyword||[];
+  if(kws.length){
+    h+='<div class="rpt-sec"><div class="rpt-sec-h">'
+      +'<span class="rpt-sec-bar"></span><span class="rpt-sec-t">关键词表现</span>'
+      +'<span class="rpt-sec-sub">共 '+kws.length+' 个词</span></div>'
+      + '<table class="rpt"><tr><th>词</th><th class="num">扫描</th>'
+      + '<th class="num">达标</th><th class="num">均分</th>'
+      + '<th class="num">最高</th></tr>'
+      + kws.map(function(k){ return "<tr><td>"+escH(k.kw)+"</td>"
+          +"<td class=\"num\">"+(k.scanned||0)+"</td>"
+          +"<td class=\"num\">"+(k.applied||0)+"</td>"
+          +"<td class=\"num\">"+(k.avg||0)+"</td>"
+          +"<td class=\"num\"><b>"+(k.top||0)+"</b></td></tr>"; }).join("")
+      + "</table></div></div>";
+  }
+  const _th=(d.cfg||{}).threshold||75;
+  const jobs=(d.jobs||[]).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+  h+='<div class="rpt-sec"><div class="rpt-sec-h">'
+    +'<span class="rpt-sec-bar"></span><span class="rpt-sec-t">岗位打分明细</span>'
+    +'<span class="rpt-sec-sub">按分数倒序 · 共 '+jobs.length+' 条 · 绿色达标 / 琥珀差一点</span></div>';
+  if(!jobs.length){
+    h+='<p style="font-size:12.5px;color:var(--muted);margin-top:6px;">'+
+       "本报告已降级为摘要（超出最近 30 次），不再保留岗位明细。</p>";
+  } else {
+    h+='<table class="rpt"><tr><th>岗位</th><th>公司</th>'
+      + '<th class="num">分数</th><th>匹配项</th><th>评分理由</th>'
+      + '<th>结果</th></tr>'
+      + jobs.map(function(j){
+          var sc=j.score||0;
+          var cls = sc>=_th ? "sc-ok" : (sc>=_th-5 ? "sc-near" : "sc-low");
+          var hit=(j.role ? j.role+" · " : "")+((j.hits||[]).join("/"));
+          if(!hit) hit="—";
+          var ev=(j.evidence||[]).map(function(x){return escH(x);}).join("；");
+          var gp=(j.gaps||[]).map(function(x){return escH(x);}).join("；");
+          var why='<div>'+escH(j.why||"")+"</div>"
+            +(ev?'<div style="color:var(--green);margin-top:3px;">+ '+ev+"</div>":"")
+            +(gp?'<div style="color:var(--red);margin-top:3px;">− '+gp+"</div>":"");
+          return "<tr>"
+            +"<td style=\"max-width:180px;\">"+escH(j.job)+"</td>"
+            +"<td class=\"dim\" style=\"max-width:140px;\">"+escH(j.company)+"</td>"
+            +"<td class=\"num "+cls+"\">"+sc+"</td>"
+            +"<td class=\"dim\">"+escH(hit)+"</td>"
+            +"<td class=\"dim\" style=\"max-width:320px;\">"+why+"</td>"
+            +"<td>"+(j.outcome_label
+                ? '<span class="tag tag-amber">'+escH(j.outcome_label)+"</span>"
+                : '<span class="dim">—</span>')+"</td>"
+            +"</tr>";
+        }).join("")
+      +"</table>";
+  }
+  h+="</div></div>";
+  el.style.display="block"; el.innerHTML=h;
+}
+
+// ===== 2026-09-18 清除报告结果 =====
+// 只清投递报告。**刻意不提供**清去重缓存/账本的入口 ——
+// 两周去重缓存是省 LLM tokens 的关键，清掉会让同岗位重新评分。
+function clearReports(){
+  const ok = window.confirm(
+    "确认清除全部投递报告？\n\n"
+    + "· 只清「投递报告」，不动两周去重缓存与投递账本\n"
+    + "· 清除后**无法复原**\n\n"
+    + "确定要继续吗？");
+  if(!ok) return;
+  act({cmd:"call", action:"clear_reports"});
+}
+function exportDelivery(){
+  const ok = window.confirm(
+    "确认导出全部投递数据？\n\n"
+    + "· 汇总 job_memory / outcomes / boss-demo-log / 最近报告\n"
+    + "· 导出为 JSON（附 CSV），保存到 run/exports/\n"
+    + "· 仅导出，不影响任何投递/缓存");
+  if(!ok) return;
+  act({cmd:"call", action:"export_delivery"});
+}
+function renderExportResult(m){
+  const r=m.result||{};
+  let msg;
+  if(r.ok){
+    msg="✅ 已导出 "+r.jobs+" 条岗位、"+r.reports+" 份报告\nJSON："+r.json+"\nCSV："+r.csv;
+  } else {
+    msg="❌ 导出失败："+(r.error||"未知错误");
+  }
+  window.alert(msg);
+}
+function renderReportsCleared(m){
+  const el=document.getElementById("reports-list"); if(!el) return;
+  const r=m.result||{};
+  const msg = r.error ? ("清除失败："+r.error)
+                      : ("已清除 "+r.reports+" 份投递报告（去重缓存与账本未动）");
+  el.innerHTML = '<p style="font-size:13px;color:var(--muted);">'+escH(msg)+"</p>";
+  const d=document.getElementById("report-detail");
+  if(d){ d.style.display="none"; d.innerHTML=""; }
+  loadReports();
+}
+
+let cur = {};
+function tagFor(s){
+  return {'分析中':'blue','投递中':'red','沟通中':'amber','闲置':'green','停止':'red','待命中':'blue'}[s]||'green';
+}
+window.bridge.onEvent(msg=>{
+  // 2026-09-21 DASH1b：确认事件是否到达看板（排查进度条问题时看不到）
+  try { console.log('[dash-event]', msg && msg.type); } catch(e) {}
+  // 2026-09-21 PROG2：进度事件 → 进度条 + 三个计数
+  if(msg.type==='progress'){
+    const total = Math.max(1, msg.total||1);
+    const pct = Math.max(0, Math.min(100, msg.pct!=null ? msg.pct : Math.round((msg.scanned||0)*100/total)));
+    const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+    const bar=document.getElementById('pg-bar'); if(bar) bar.style.width=pct+'%';
+    set('pg-pct', pct+'%');
+    set('pg-scan', msg.scanned||0);
+    set('pg-skip', msg.skipped||0);
+    set('pg-apply', msg.applied||0);
+    set('pg-kw', (msg.kw_done||0)+'/'+(msg.kw_total||0));
+    // 2026-09-21 修正文案：真实流程是「收集 → 评分/投递」两阶段，
+    // 原来只写"已扫 X / 目标 Y"对不上口径（扫的只是评分过的岗位）。
+    set('pg-text', '第 '+((msg.kw_done||0)+1)+'/'+(msg.kw_total||0)+' 个关键词 · 已收集 '
+        +(msg.collected||0)+'/35 · 已评分 '+(msg.scanned||0));
+  }
+
+  if(msg.type==='log') addLog(msg.text);
+  if(msg.type==='bubble') addLog('🐱 '+msg.text);
+  if(msg.type==='hr_alert'){
+    hrMsgs.push(msg); if(hrMsgs.length>50) hrMsgs.shift();
+    renderInbox();
+  }
+  if(msg.type==='reports') renderReports(msg.list);          // 2026-09-18 复盘报告
+  if(msg.type==='hr_inbound') renderInbound(msg.list);
+  if(msg.type==='kw_feedback') renderKwFeedback(msg.list);   // 2026-09-22 KWFB1       // 2026-09-19 非方案来话
+  if(msg.type==='startup_diagnosis') renderStartupDiagnosis(msg);  // 2026-09-22 STARTUP-DIAG
+  if(msg.type==='report_detail') renderReportDetail(msg.data);
+  if(msg.type==='reports_cleared') renderReportsCleared(msg);  // 2026-09-18
+  if(msg.type==='export_delivery') renderExportResult(msg);   // 2026-09-23 EXPORT
+  // 2026-09-19 Q1 方案 A：HR 回复随时到达 —— 若详情开着就重拉那一页，
+  // 再顺带刷一下列表（列表将来会显示「有几条回复」）。
+  if(msg.type==='outcomes_updated'){
+    if(curRunId) act({cmd:'call', action:'report_detail', run_id: curRunId});
+    loadReports();
+  }
+  if(msg.type==='state' || msg.type==='snapshot'){
+    const st = msg.state || '—';
+    document.getElementById('ov-state').innerHTML = '<span class="tag tag-'+tagFor(st)+'">'+st+'</span>';
+    const running = (st === '投递中' || st === '沟通中');
+    document.querySelectorAll('.blk.edit .icard').forEach(el => {
+      el.style.opacity = running ? '0.5' : '1';
+      el.style.pointerEvents = running ? 'none' : 'auto';
+    });
+  }
+  if(msg.type==='snapshot'){
+    // 看板打开/刷新时拉取全部历史 HR 消息
+    if(Array.isArray(msg.hr_messages)){
+      hrMsgs.length = 0;
+      msg.hr_messages.forEach(m => hrMsgs.push(m));
+      renderInbox();
+    }
+  }
+  if(msg.type==='ready'){
+    // Python 重启后自动重拉状态
+    window.bridge.send({cmd:'get_state'});
+  }
+  if(msg.type==='snapshot'){
+    cur = msg;
+    const s=msg.plan||{};
+    document.getElementById('ov-sallow').value = s.salary_low || '';
+    document.getElementById('ov-salhigh').value = s.salary_high || '';
+    document.getElementById('ov-score').value = s.min_score || '';
+    document.getElementById('ov-city').value = s.city || '';
+    document.getElementById('ov-exclude').value = (s.exclude_keywords||[]).join('、');
+    document.getElementById('ov-kw').textContent = (s.keywords||[]).length;
+    const kl=document.getElementById('ov-kwlist');
+    if((s.keywords||[]).length){ kl.innerHTML=s.keywords.map(k=>'<span class="chip">'+k+'</span>').join(''); }
+    // 回填关键词编辑框
+    document.getElementById('edit-kw').value = (s.keywords||[]).join('、');
+    // 统计卡片
+    const st2 = msg.stats||{};
+    document.getElementById('ov-greet').textContent = st2.greet||0;
+    document.getElementById('ov-resume').textContent = st2.resume_send||0;
+    document.getElementById('ov-skip').textContent = st2.skip||0;
+    document.getElementById('ov-fail').textContent = st2.fail||0;
+  }
+  if(msg.type==='llm_test'){
+    const box=document.getElementById('llm-status');
+    const color = msg.ok ? 'var(--green)' : 'var(--red)';
+    box.innerHTML='<span style="color:'+color+';font-weight:600;">'+msg.msg+'</span>';
+  }
+  if(msg.type==='config'){
+    if(msg.llm){
+      document.getElementById('llm-url').value = msg.llm.base_url||'';
+      document.getElementById('llm-model').value = msg.llm.model||'';
+      const box=document.getElementById('llm-status');
+      box.innerHTML='<span style="color:var(--green);font-weight:600;">✅ 配置已保存</span>';
+      showToast('✅ LLM 配置已保存');
+    }
+    if(msg.plan_saved){
+      showToast('✅ 方案已保存');
+    }
+    if(msg.plan_error){
+      showToast('⚠️ '+msg.plan_error);
+    }
+  }
+  if(msg.type==='models'){
+    const box=document.getElementById('llm-models');
+    llmFetchedModels = msg.ids || [];   // 2026-09-21：保存时只认这份清单里的模型
+    if(msg.error){ box.innerHTML='<span style="color:var(--red);font-size:12px;">'+msg.error+'</span>'; return; }
+    box.innerHTML=(msg.ids||[]).map(m=>'<span class="chip" style="cursor:pointer" onclick="document.getElementById(\'llm-model\').value=\''+m+'\'">'+m+'</span>').join('');
+  }
+});
+function showToast(msg){
+  let t = document.getElementById('dash-toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'dash-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.style.opacity='0'; }, 2000);
+}
+
+// 2026-09-21：保存 LLM 设置的硬门槛 —— 模型必须来自「拉取结果」。
+// 手填或沿用旧值一律拦下，避免填错模型名导致整条链路静默失效。
+var llmFetchedModels = [];
+function saveLlm(){
+  var u=(document.getElementById('llm-url').value||'').trim();
+  var k=(document.getElementById('llm-key').value||'').trim();
+  var m=(document.getElementById('llm-model').value||'').trim();
+  var st=document.getElementById('llm-status');
+  if(!u || !k){ if(st) st.textContent='请先填写 Base URL 与 API Key。'; return; }
+  if(!llmFetchedModels.length || llmFetchedModels.indexOf(m) < 0){
+    if(st) st.textContent='请先点「🔄 拉取模型」，再从下方列表里点选一个模型，然后保存。';
+    return;
+  }
+  window.bridge.send({cmd:'save_llm', url:u, key:k, model:m});
+  if(st) st.textContent='✅ 已保存（模型：' + m + '）';
+}
+// URL / Key 一改动，已拉取的清单即作废 —— 必须重新拉取
+['llm-url','llm-key'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener('input', function(){ llmFetchedModels = []; });
+});
+function fetchModels(){
+  window.bridge.send({cmd:'fetch_models', url:document.getElementById('llm-url').value, key:document.getElementById('llm-key').value});
+}
+function savePlan(){
+  window.bridge.send({cmd:'update_plan',
+    keywords: document.getElementById('edit-kw').value});
+  showToast('✅ 关键词已保存');
+}
+// 总览卡片可编辑项失焦自动保存
+['ov-sallow','ov-salhigh'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', ()=>{
+    window.bridge.send({cmd:'update_plan',
+      salary_low: document.getElementById('ov-sallow').value,
+      salary_high: document.getElementById('ov-salhigh').value});
+    showToast('✅ 薪资已保存');
+  });
+});
+document.getElementById('ov-score').addEventListener('change', ()=>{
+  window.bridge.send({cmd:'update_plan', min_score: document.getElementById('ov-score').value});
+  showToast('✅ 岗位匹配值已保存');
+});
+document.getElementById('ov-exclude').addEventListener('change', ()=>{
+  window.bridge.send({cmd:'update_plan',
+    exclude_keywords: document.getElementById('ov-exclude').value});
+});
+document.getElementById('ov-city').addEventListener('change', ()=>{
+  window.bridge.send({cmd:'update_plan', city: document.getElementById('ov-city').value});
+  showToast('✅ 城市已保存');
+});
+// 进入看板时拉一次状态
+window.bridge.send({cmd:'get_state'});
+// 2026-09-21 GOTO1：与导航按钮对齐 —— 进 insights 时也要 loadReports()。
+// 原来只 go(p)，导致从右键菜单进「分析报告」页面空白（报告没拉）。
+window.bridge.onGotoPage((p)=>{ go(p); if(p==='insights') loadReports(); });
+</script>
+</body>
+</html>

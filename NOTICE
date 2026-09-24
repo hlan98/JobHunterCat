@@ -1,0 +1,89 @@
+# NOTICE
+
+## Licensing summary
+
+JobHunter Cat (找工作喵) is a repository in which **different files are covered by different
+licenses**. This is *not* a choice-of-license ("dual-licensing") arrangement — the license is
+determined by which file you are looking at, and users have no choice between them.
+
+This project incorporates and modifies code originally distributed under the MIT License.
+
+Additional original components developed for JobHunter Cat are separately identified in the repository.
+
+---
+
+## ⚠️ 重要：混合文件的处理
+
+本仓库中的原项目代码**并非原样保留**，而是在原 MIT 代码基础上做了修改。
+这类文件**同一个文件里既有 MIT 代码，也有后续新增的代码** —— 即**混合文件**。
+
+**不能**因为"我改了一部分"就把整个文件改按新许可授权。
+混合文件仍**整体包含 MIT 代码**，因此**整体继续适用 MIT**。
+
+逐文件的来源与逐行差异数据，见 [`docs/CODE_PROVENANCE.md`](docs/CODE_PROVENANCE.md)。
+
+> 本 NOTICE 是**事实声明**，不构成法律意见。混合文件的授权问题涉及衍生作品认定、
+> 贡献者权利等具体法律问题，如有需要请咨询专业人士。
+
+---
+
+## 三类文件与适用许可
+
+| 类别 | 路径 | 适用许可 | 商业使用 |
+|---|---|---|---|
+| **① 纯原创** | `agent/main.py`、`agent/pet_bridge.py`、`desktop/`、`memory/`、`assets/`、`scripts/`、`docs/`、根目录文件 | PolyForm Noncommercial 1.0.0 | ❌ **需授权** |
+| **② 来源于原项目** | `examples/` | MIT | ✅ 允许 |
+| **③ 混合文件** | `boss/boss_apply.py`、`boss/boss_chat.py`、`agent/shared.py`、`agent/ledger.py`、`agent/doctor.py`、`agent/skill_entry.py`、`tests/` | **MIT**（整体，含后续修改） | ✅ 允许 |
+
+**保守处置原则**：混合文件一律整体按 MIT 处理，不追加任何限制。
+
+实测（相对 **2026-09-12 基线**）这些文件 **87.8% 的行与基线保持匹配**，
+即与基线高度一致，后续新增/重写约占 12.2%。
+
+> ⚠️ 该比例表示"与 2026-09-12 基线的一致程度"，
+> **不表示**"与上游 MIT 原始版本的一致程度"。
+> `examples/` 则与基线快照**逐行完全一致**（未发现后续修改）。
+
+---
+
+## MIT 部分的完整许可文本
+
+保留于 [`LICENSES/MIT-job-hunter-skill.txt`](LICENSES/MIT-job-hunter-skill.txt)。
+
+原始声明：
+
+```
+MIT License
+
+Copyright (c) 2026 Job Hunter contributors
+```
+
+根据 MIT 许可条款，该版权声明与许可全文必须随本仓库一并保留。
+
+---
+
+## 关于商用
+
+| 部分 | 商业使用 |
+|---|---|
+| MIT 部分（含混合文件） | ✅ 按 MIT 许可，任何人可自由使用、修改、分发，**包括商业用途**。本项目无法也不对其施加额外限制 |
+| PolyForm Noncommercial 部分（纯原创） | ❌ 个人、学习、研究、非营利机构免费；**商业用途需获得授权** |
+
+因此 **本仓库整体不能一概视为"禁止商用"** ——
+限制只作用于上表中标注为 PolyForm Noncommercial 的原创部分。
+
+如需将**原创部分**用于商业场景，请联系作者获得授权。
+
+联系方式：Leo He
+
+- 邮箱：hlan98@hotmail.com
+- QQ：`104495956`
+- GitHub：<https://github.com/hlan98>
+
+---
+
+## 第三方依赖
+
+依赖的第三方库适用其自身许可，不受本仓库许可影响。
+**特别注意 `pymupdf` 为 AGPL-3.0**，商用前请评估开源义务。
+详见 [`docs/CODE_PROVENANCE.md`](docs/CODE_PROVENANCE.md) 附录。

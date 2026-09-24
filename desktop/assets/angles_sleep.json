@@ -1,0 +1,14 @@
+{
+  "source": "sleep.mp4",
+  "state": "sleep",
+  "fps": 20,
+  "frameCount": 46,
+  "width": 640,
+  "height": 640,
+  "contentScale": 1,
+  "mode": "loop",
+  "alpha": {
+    "method": "edge-connected chroma matte + dark-adjacency cleanup",
+    "sourceHasAlpha": false
+  }
+}
