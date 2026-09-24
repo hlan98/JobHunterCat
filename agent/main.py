@@ -3514,7 +3514,11 @@ class PetApp:
                     if self._stop_requested:
                         return
                     try:
+                        # 2026-09-24 SLOWTRACE：读卡片计时（只在慢时打日志）
+                        _t_st = time.time()
                         info = boss_apply.extract_card_info(card)
+                        if time.time() - _t_st > 5:
+                            self.add_log("⏱ 读卡片耗时 %.1fs" % (time.time() - _t_st))
                         title = info["title"]
                         if not title:
                             continue
@@ -3559,17 +3563,30 @@ class PetApp:
                         if info["href"]:
                             try:
                                 # 加锁：和监听线程不同时操作浏览器
+                                # 2026-09-24 SLOWTRACE：这条链路逐步计时，定位静默空档
+                                _t_st = time.time()
                                 self._browser_lock.acquire()
+                                if time.time() - _t_st > 3:
+                                    self.add_log("⏱ 等浏览器锁 %.1fs" % (time.time() - _t_st))
                                 try:
                                     self.add_log("打开详情页：%s → %s" % (title, info["href"]))
+                                    _t_st = time.time()
                                     dt = browser.new_tab(info["href"])
+                                    if time.time() - _t_st > 8:
+                                        self.add_log("⏱ 打开详情页耗时 %.1fs" % (time.time() - _t_st))
                                     time.sleep(3)
                                     self.add_log("  → 读 JD 文本 + 薪资信息")
+                                    _t_st = time.time()
                                     jd = boss_apply.extract_detail_text(dt) or jd
+                                    if time.time() - _t_st > 8:
+                                        self.add_log("⏱ 读 JD 耗时 %.1fs" % (time.time() - _t_st))
                                     sal_el = shared.find_first(dt, ["css:.salary", "css:.job-salary"], timeout=0.8)
                                     salary_text = shared.safe_text(sal_el) or salary_text
                                     self.add_log("  → 详情页读完，关闭 tab（薪资：%s）" % salary_text)
+                                    _t_st = time.time()
                                     dt.close()
+                                    if time.time() - _t_st > 5:
+                                        self.add_log("⏱ 关闭 tab 耗时 %.1fs" % (time.time() - _t_st))
                                 finally:
                                     self._browser_lock.release()
                             except Exception:
