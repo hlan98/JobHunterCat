@@ -1,0 +1,28 @@
+# ============================================================
+# 行尾统一
+# ============================================================
+# 仓库内一律存 LF；检出时由下面的规则决定工作区用哪种。
+# 目的：不同平台（Windows / macOS / Linux）协作者拿到的行尾一致，
+# 不会因为编辑器把整文件的行尾改掉而产生「全文件 diff」。
+* text=auto eol=lf
+
+# Windows 批处理必须用 CRLF —— cmd.exe 解析 label / goto 时对 LF 行尾不可靠。
+# 这里写 eol=crlf 表示「任何平台检出都用 CRLF」，而不是只在 Windows 上用。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# ============================================================
+# 二进制文件：禁止行尾转换，也不要尝试文本 diff
+# ============================================================
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.mp4  binary
+*.webp binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary
+*.onnx binary
+*.zip  binary

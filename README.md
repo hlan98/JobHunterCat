@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/cat.png" width="240" alt="爬爬 — 找工作喵的猫">
+</p>
+
 # 🐱 JobHunter Cat · 找工作喵
 
 > **A desktop AI agent that searches, evaluates and applies for jobs — then learns from the results.**
@@ -99,20 +103,26 @@
 
 ---
 
-## 🐱 Why JobHunter Cat?
+## 🐱 Why JobHunter Cat? · 为什么是找工作喵？
 
 Most job-search automation focuses on one action:
+大多数求职自动化只解决一个动作：
 
 > **Find a job → Apply**
+>
+> **找到岗位 → 投出去**
 
 JobHunter Cat explores a longer loop:
+找工作喵探索的是一个更长的闭环：
 
 > **Understand → Plan → Search → Match → Apply → Observe → Remember → Adapt**
+>
+> **理解 → 规划 → 搜索 → 匹配 → 投递 → 观察 → 记忆 → 调整**
 
-The desktop cat is the interface.
-The Agent does the work.
-The Job Memory keeps the context.
-The Strategy Engine turns past results into future decisions.
+**The desktop cat is the interface. The Agent does the work.**
+**The Job Memory keeps the context. The Strategy Engine turns past results into future decisions.**
+
+**桌面猫是交互入口，Agent 在背后干活；求职记忆保留上下文，策略引擎把过去的结果变成下一个决策。**
 
 ---
 
