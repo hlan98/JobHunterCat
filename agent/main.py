@@ -241,6 +241,10 @@ def looks_like_plan_change(text: str) -> bool:
     return (has_field and (any(verb in value for verb in verbs) or has_numeric_value)) or reorder_hint
 
 
+# 2026-09-25 LLMRECOVER：LLM 就绪状态用模块级锁保护（「判断 + 改标记」原子化，防并发重复提示）。
+_LLM_STATE_LOCK = threading.Lock()
+
+
 class PetApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -390,6 +394,7 @@ class PetApp:
         # 否则用户拖完简历只会拿到一个 0 关键词的空方案（2026-09-24 实测踩过）。
         try:
             self._llm_degraded = False   # 2026-09-25 LLMRECOVER：LLM 未就绪标记（供评分恢复提示用）
+            self._llm_fail_streak = 0    # LLMRECOVER：连续「本应调 LLM 却失败」次数（防抖）
             _llm0 = shared.build_llm_client(self.cfg)
             if not getattr(_llm0, "is_configured", lambda: False)():
                 self.add_log("启动检查：LLM 未配置（新用户需先配置，否则无法从简历提炼关键词）")
@@ -4273,22 +4278,57 @@ class PetApp:
         except Exception:
             pass
 
-    def _score_jd(self, *args, **kwargs):
-        """2026-09-25 LLMRECOVER：包装 shared.score_jd —— 若本轮评分**成功调用了 LLM**
-        （`res.llm_ok` 为真）而此前处于降级状态（启动时 LLM 未就绪），则提示「已恢复正常」。
+    _LLM_DEGRADED_AFTER = 2   # LLMRECOVER：连续 N 次「本应调 LLM 却失败」才判失效（防抖）
 
-        用户要求：坏了要提示，**好了也要提示**；检查点就放在「岗位评分恢复正常调用 LLM」这里，
-        **不额外写轮询 / 排查逻辑**。
+    def _score_jd(self, *args, **kwargs):
+        """2026-09-25 LLMRECOVER：包装 shared.score_jd，做「LLM 失效 / 恢复正常」的状态轮转。
+
+        · 评分**成功调用 LLM**（`res.llm_ok`）且此前处于降级态 → 提示「已恢复正常」并清标记；
+        · 评分**本应调 LLM 却失败**（`llm_ok=False` 且确实该调）**连续** `_LLM_DEGRADED_AFTER` 次
+          → 判失效：提示一次并置标记（防抖：偶发一次失败不算，避免反复弹）。
+        · 「确实该调」= `use_llm` 且 `allow_resume_upload` 且 LLM 已配置 ——
+          否则 `llm_ok=False` 只是「按设计没调 LLM」，**不能**当失效。
+        · 「判断 + 改标记」用 `_LLM_STATE_LOCK` 原子化，杜绝并发下重复弹。
+
+        用户要求：坏了要提示，**好了也要提示**；检查点放在「岗位评分」这条链路，不写轮询。
         """
-        _orig = shared.score_jd          # 取原函数（避免下面 replace_all 时误改本行）
+        _orig = shared.score_jd
         res = _orig(*args, **kwargs)
         try:
-            if getattr(res, "llm_ok", False) and getattr(self, "_llm_degraded", False):
-                self._llm_degraded = False
+            _ok = bool(getattr(res, "llm_ok", False))
+            _should = False   # 本轮 LLM 是否「本应被调用」
+            try:
+                _cli = shared.build_llm_client(self.cfg)
+                _should = (bool(kwargs.get("use_llm", True))
+                           and bool((self.cfg.get("llm") or {}).get("allow_resume_upload", False))
+                           and bool(getattr(_cli, "is_configured", lambda: False)()))
+            except Exception:
+                _should = False
+            _recovered = False
+            _degraded_now = False
+            with _LLM_STATE_LOCK:
+                if _ok:
+                    self._llm_fail_streak = 0
+                    if getattr(self, "_llm_degraded", False):
+                        self._llm_degraded = False
+                        _recovered = True
+                elif _should:
+                    self._llm_fail_streak = getattr(self, "_llm_fail_streak", 0) + 1
+                    if (self._llm_fail_streak >= self._LLM_DEGRADED_AFTER
+                            and not getattr(self, "_llm_degraded", False)):
+                        self._llm_degraded = True
+                        _degraded_now = True
+            if _recovered:
                 self.add_log("LLM 已恢复正常（岗位评分已成功调用 LLM）")
                 self.root.after(0, lambda: self.set_bubble(
                     "✅ LLM 已恢复正常 —— 岗位评分已能正常调用 LLM，"
                     "简历诊断 / 投递关键词也都可用了。"))
+            elif _degraded_now:
+                self.add_log("LLM 连不上（岗位评分已连续 %d 次退回本地启发式）"
+                             % self._LLM_DEGRADED_AFTER)
+                self.root.after(0, lambda: self.set_bubble(
+                    "⚠️ LLM 连不上了 —— 岗位评分已退回本地启发式（分数偏低、容易全被过滤）。\n"
+                    "多半是密钥 / 网络 / 代理问题；修好后我会自动提示你已恢复。"))
         except Exception:
             pass
         return res
