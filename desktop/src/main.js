@@ -136,7 +136,16 @@ function startBridge() {
     }
   });
   child.stderr.on('data', (d) => {
-    process.stdout.write('[py-stderr] ' + d.toString('utf-8'));
+    // 2026-09-25 HANGFIX：**不能无条件 process.stdout.write** ——
+    // Node 在 Windows 上「管道」的 stdout 写入是**同步**的；主进程 stdout 无人消费时
+    // 缓冲区满会**阻塞 Electron 主进程事件循环** → 整个 app 未响应
+    // （用户实测：HR 监听让 Python 狂写 stderr，主进程 ~15:56:16 卡死，Python 却还在跑）。
+    // 只在真有控制台（TTY，写入异步、不阻塞）时才镜像到控制台；其余情况只落日志文件。
+    try {
+      if (process.stdout && process.stdout.isTTY) {
+        process.stdout.write('[py-stderr] ' + d.toString('utf-8'));
+      }
+    } catch (_) {}
     try { fs.appendFileSync(path.join(SHELL_ROOT, 'bridge-debug.log'), '[stderr] ' + d.toString('utf-8')); } catch {}
   });
   child.on('close', (code) => {
@@ -192,8 +201,17 @@ function forwardToWindows(line) {
 
 // 发给 Python
 function toBridge(obj) {
-  if (!py) return;
-  py.stdin.write(JSON.stringify(obj) + '\n');
+  // 2026-09-25 HANGFIX：
+  // ① 所有发送都留痕 —— 托盘菜单原来**直接调本函数**，绕过了 ipcMain 的 `IN:` 日志，
+  //    导致用户点「⏹ 停止」在 bridge-debug.log 里查不到（实测踩过）；
+  // ② 加守卫：stdin 不可写时不再硬写（避免 EPIPE / 无谓阻塞）。
+  try { fs.appendFileSync(path.join(SHELL_ROOT, 'bridge-debug.log'), new Date().toISOString() + ' IN: ' + JSON.stringify(obj) + '\n'); } catch {}
+  if (!py || !py.stdin || py.stdin.destroyed || !py.stdin.writable) return;
+  try {
+    py.stdin.write(JSON.stringify(obj) + '\n');
+  } catch (e) {
+    try { fs.appendFileSync(path.join(SHELL_ROOT, 'bridge-debug.log'), '[toBridge-error] ' + (e && e.message) + '\n'); } catch {}
+  }
 }
 
 // ---------- 窗口 ----------
@@ -356,7 +374,7 @@ ipcMain.on('drag-end', () => {});
 
 // 对话窗 / 看板窗 -> Python
 ipcMain.on('to-bridge', (_e, obj) => {
-  try { fs.appendFileSync(path.join(SHELL_ROOT, 'bridge-debug.log'), new Date().toISOString() + ' IN: ' + JSON.stringify(obj) + '\n'); } catch {}
+  // 2026-09-25 HANGFIX：`IN:` 日志已统一移到 toBridge() 内（托盘菜单也走同一条路），此处不再重复记。
   // 用户发的话也记入历史
   if (obj && obj.cmd === 'user_text' && obj.text) {
     chatHistory.push({ role: 'me', text: String(obj.text) });
