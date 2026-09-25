@@ -389,6 +389,7 @@ class PetApp:
         # 这里在启动问候之后**主动提示**，把「配置 LLM」补进新用户流程；
         # 否则用户拖完简历只会拿到一个 0 关键词的空方案（2026-09-24 实测踩过）。
         try:
+            self._llm_degraded = False   # 2026-09-25 LLMRECOVER：LLM 未就绪标记（供评分恢复提示用）
             _llm0 = shared.build_llm_client(self.cfg)
             if not getattr(_llm0, "is_configured", lambda: False)():
                 self.add_log("启动检查：LLM 未配置（新用户需先配置，否则无法从简历提炼关键词）")
@@ -399,10 +400,13 @@ class PetApp:
                     "也可以点下面的链接直接打开设置：")
                 # 2026-09-25 CFGLINK：未配置分支也给出可点链接（原来只有文字引导，无入口）
                 self._emit_link("打开 LLM 设置", self.cmd_llm_settings)
+                # 2026-09-25 LLMRECOVER：标记「LLM 未就绪」→ 岗位评分首次成功调 LLM 时提示恢复
+                self._llm_degraded = True
             else:
                 # 2026-09-24 RESUMELLM：已配置 → **后台**探一次连通性（不阻塞启动）。
                 # 用户实测：新机器上没配 / 连不上 LLM 时，拖简历会静默降级成「没有关键信息的回复」。
                 def _llm_ping_startup():
+                    _ok = False   # 2026-09-25 LLMRECOVER：本次探测是否通过（未通过则后台复探）
                     try:
                         # 2026-09-24 LLMFIX：原写法 chat_text("ping", max_tokens=, temperature=)
                         # 只传了 system_prompt，漏掉必填的 user_prompt → 抛
@@ -412,7 +416,9 @@ class PetApp:
                             "你是连通性自检助手，仅用于确认 LLM 接口是否可用。",
                             "请只回复两个字：pong",
                             max_tokens=50, temperature=0.0) or ""
-                        if not str(_txt).strip():
+                        if str(_txt).strip():
+                            _ok = True
+                        else:
                             self.add_log("启动检查：LLM 连通性异常（返回为空）")
                             self.root.after(0, lambda: self.set_bubble(
                                 "⚠️ LLM 配置看着是好的，但**探测返回为空** ——\n"
@@ -427,6 +433,9 @@ class PetApp:
                                 "多半是密钥 / 网络 / 代理问题，可点下方「打开 LLM 设置」核对：\n"
                                 "① base_url 是否填对 ② 密钥是否有效 ③ 是否开了系统代理却没真正连上。" % m),
                             self._emit_link("打开 LLM 设置", self.cmd_llm_settings)))
+                    # 2026-09-25 LLMRECOVER：本次未通过 → 标记未就绪；岗位评分成功调 LLM 时提示恢复
+                    if not _ok:
+                        self._llm_degraded = True
                 try:
                     threading.Thread(target=_llm_ping_startup, daemon=True).start()
                 except Exception:
@@ -655,7 +664,7 @@ class PetApp:
                     time.sleep(0.3)
                 try:
                     # 不传 resume_text：自动读 run/resume.md，走真实 LLM 补分；LLM 失败自动回退启发式
-                    res = shared.score_jd(title, jd, self.cfg, skill_dir=RUN_DIR)
+                    res = self._score_jd(title, jd, self.cfg, skill_dir=RUN_DIR)
                     self.session["llm_calls"] += 1
                 except Exception as exc:
                     self.root.after(0, lambda e=exc: self.add_log("评分异常：%s" % e))
@@ -3004,7 +3013,7 @@ class PetApp:
                             self._emit_progress(rec)
                             kw_scanned += 1
                             try:
-                                res = shared.score_jd(title, jd, self.cfg, skill_dir=RUN_DIR,
+                                res = self._score_jd(title, jd, self.cfg, skill_dir=RUN_DIR,
                                                      resume_text=self._current_resume(),
                                                      use_llm=real)
                                 rec["llm"] += int(bool(getattr(res, "llm_ok", False)))
@@ -3353,7 +3362,7 @@ class PetApp:
                     rec["scan"] += 1
                     kw_scanned += 1
                     try:
-                        res = shared.score_jd(title, jd, self.cfg, skill_dir=RUN_DIR, use_llm=True)
+                        res = self._score_jd(title, jd, self.cfg, skill_dir=RUN_DIR, use_llm=True)
                     except Exception:
                         continue
                     kw_scores.append(res.total_score)
@@ -4263,6 +4272,26 @@ class PetApp:
             self.root.after(0, cb)
         except Exception:
             pass
+
+    def _score_jd(self, *args, **kwargs):
+        """2026-09-25 LLMRECOVER：包装 shared.score_jd —— 若本轮评分**成功调用了 LLM**
+        （`res.llm_ok` 为真）而此前处于降级状态（启动时 LLM 未就绪），则提示「已恢复正常」。
+
+        用户要求：坏了要提示，**好了也要提示**；检查点就放在「岗位评分恢复正常调用 LLM」这里，
+        **不额外写轮询 / 排查逻辑**。
+        """
+        _orig = shared.score_jd          # 取原函数（避免下面 replace_all 时误改本行）
+        res = _orig(*args, **kwargs)
+        try:
+            if getattr(res, "llm_ok", False) and getattr(self, "_llm_degraded", False):
+                self._llm_degraded = False
+                self.add_log("LLM 已恢复正常（岗位评分已成功调用 LLM）")
+                self.root.after(0, lambda: self.set_bubble(
+                    "✅ LLM 已恢复正常 —— 岗位评分已能正常调用 LLM，"
+                    "简历诊断 / 投递关键词也都可用了。"))
+        except Exception:
+            pass
+        return res
 
     def _hide_action_panel(self) -> None:
         if self._action_panel is not None:
@@ -6099,7 +6128,7 @@ class PetApp:
                             time.sleep(0.4)
                         if self._stop_requested:
                             break
-                        res = shared.score_jd(title, jd_text or title, self.cfg, skill_dir=RUN_DIR, use_llm=True)
+                        res = self._score_jd(title, jd_text or title, self.cfg, skill_dir=RUN_DIR, use_llm=True)
                         ok += 1
                         self.session["scan_jobs"] += 1
                         lines.append("%s %d分(规则) %s" % (title, res.total_score, company))
@@ -6197,7 +6226,7 @@ class PetApp:
                                 dt.close()
                             except Exception:
                                 pass
-                        res = shared.score_jd(title, jd_text or title, self.cfg, skill_dir=RUN_DIR, use_llm=True)
+                        res = self._score_jd(title, jd_text or title, self.cfg, skill_dir=RUN_DIR, use_llm=True)
                         ok += 1
                         self.session["scan_jobs"] += 1
                         lines.append("%s %d分(规则) %s" % (title, res.total_score, info["salary"] or ""))
