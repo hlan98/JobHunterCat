@@ -401,7 +401,14 @@ class PetApp:
                 # 用户实测：新机器上没配 / 连不上 LLM 时，拖简历会静默降级成「没有关键信息的回复」。
                 def _llm_ping_startup():
                     try:
-                        _txt = _llm0.chat_text("ping", max_tokens=200, temperature=0.0) or ""
+                        # 2026-09-24 LLMFIX：原写法 chat_text("ping", max_tokens=, temperature=)
+                        # 只传了 system_prompt，漏掉必填的 user_prompt → 抛
+                        # "missing 1 required positional argument: 'user_prompt'"，被 except 误判为
+                        # "LLM 连不上"，导致已正确配置的用户也看到这条告警。补上 user_prompt 即可。
+                        _txt = _llm0.chat_text(
+                            "你是连通性自检助手，仅用于确认 LLM 接口是否可用。",
+                            "请只回复两个字：pong",
+                            max_tokens=50, temperature=0.0) or ""
                         if not str(_txt).strip():
                             self.add_log("启动检查：LLM 连通性异常（返回为空）")
                             self.root.after(0, lambda: self.set_bubble(
@@ -410,10 +417,16 @@ class PetApp:
                     except Exception as _e0:
                         _msg = str(_e0)[:120]
                         self.add_log("启动检查：LLM 连不上（%s）" % _msg)
-                        self.root.after(0, lambda m=_msg: self.set_bubble(
-                            "⚠️ LLM 连不上：%s\n\n"
-                            "简历诊断 / 投递关键词 / 岗位评分都会受影响。\n"
-                            "请检查密钥与网络；若装了代理软件，确认它已启动（或关掉系统代理）。" % m))
+                        self.root.after(0, lambda m=_msg: (
+                            self.set_bubble(
+                                "⚠️ LLM 连不上：%s\n\n"
+                                "简历诊断 / 投递关键词 / 岗位评分都会受影响。\n"
+                                "多半是密钥 / 网络 / 代理问题，可点下方「打开 LLM 设置」核对：\n"
+                                "① base_url 是否填对 ② 密钥是否有效 ③ 是否开了系统代理却没真正连上。" % m),
+                            self._show_action_panel(
+                                "快速处理",
+                                [("打开 LLM 设置", "open_llm_settings")],
+                                lambda v=None: self.cmd_llm_settings())))
                 try:
                     threading.Thread(target=_llm_ping_startup, daemon=True).start()
                 except Exception:
