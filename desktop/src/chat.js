@@ -100,6 +100,22 @@ function addPanel(title, options, onPick) {
   pendingPanel = el;
 }
 
+function addLink(text, onClick) {
+  const el = document.createElement('div');
+  el.className = 'msg link';
+  const a = document.createElement('a');
+  a.href = 'javascript:void(0)';
+  a.textContent = text;
+  a.style.color = '#477ba8';
+  a.style.cursor = 'pointer';
+  a.style.textDecoration = 'underline';
+  a.style.fontSize = '14px';
+  a.onclick = onClick;
+  el.appendChild(a);
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
 let pendingChoice = null;
 let pendingPanel = null;   // 2026-09-24 PANELCLOSE：当前待选面板（选完 / 收到 close 时移除）
 let planViewed = false;  // 用户是否主动点过"投递方案"看过当前方案
@@ -178,6 +194,9 @@ window.bridge.onEvent((msg) => {
           (msg.options || []).map(o => ({ label: o.label })),
           (i) => window.bridge.send({ cmd: 'choice', index: i + 1 }));
       }
+      break;
+    case 'link':
+      addLink(msg.text || '打开 LLM 设置', () => window.bridge.openSettings());
       break;
     case 'error':
       addMsg('⚠ ' + msg.text, 'cat');

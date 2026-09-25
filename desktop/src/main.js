@@ -368,6 +368,8 @@ ipcMain.on('resume-file', (_e, path) => toBridge({ cmd: 'resume_file', path }));
 
 // Dashboard "重新上传简历"按钮 -> 走 Electron 原生文件选择器
 ipcMain.on('open_resume_picker', () => chooseResumeFile());
+// 聊天框「打开 LLM 设置」超链接 -> 打开看板 LLM 设置页
+ipcMain.on('open-llm-settings', () => openDashboardWindow('settings'));
 
 // 鼠标位置轮询（猫头跟随）
 function startCursorLoop() {

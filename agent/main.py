@@ -423,10 +423,7 @@ class PetApp:
                                 "简历诊断 / 投递关键词 / 岗位评分都会受影响。\n"
                                 "多半是密钥 / 网络 / 代理问题，可点下方「打开 LLM 设置」核对：\n"
                                 "① base_url 是否填对 ② 密钥是否有效 ③ 是否开了系统代理却没真正连上。" % m),
-                            self._show_action_panel(
-                                "快速处理",
-                                [("打开 LLM 设置", "open_llm_settings")],
-                                lambda v=None: self.cmd_llm_settings())))
+                            self._emit_link("打开 LLM 设置", self.cmd_llm_settings)))
                 try:
                     threading.Thread(target=_llm_ping_startup, daemon=True).start()
                 except Exception:
@@ -4235,6 +4232,14 @@ class PetApp:
         #     self.root.geometry("360x580+%d+%d" % (x, y))
         # except Exception:
         #     pass
+
+    def _emit_link(self, text: str, callback=None) -> None:
+        """超链接式 LLM 设置入口：Tkinter 模式下直接打开设置窗；Electron 下由 pet_bridge 覆盖为聊天框链接。"""
+        try:
+            cb = callback or self.cmd_llm_settings
+            self.root.after(0, cb)
+        except Exception:
+            pass
 
     def _hide_action_panel(self) -> None:
         if self._action_panel is not None:

@@ -359,6 +359,13 @@ def _build_headless():
             emit({"type": "panel", "kind": "action", "title": str(title),
                   "options": [{"label": lbl, "index": i} for i, (lbl, _v) in enumerate(options)]})
 
+        def _emit_link(self, text: str, callback=None):
+            """聊天框超链接：Electron 下渲染为可点击文本，点击打开 LLM 设置看板（不依赖 Tkinter 窗）。"""
+            try:
+                emit({"type": "link", "text": str(text), "action": "open_llm_settings"})
+            except Exception:
+                pass
+
         def _hide_action_panel(self):
             _pending_panel["kind"] = None
             _pending_panel["callback"] = None
