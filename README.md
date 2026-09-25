@@ -28,6 +28,67 @@
 
 ---
 
+## ⚡ Quick Start · 5 分钟跑起来
+
+> 只想先跑起来？看这一节就够。想了解它为什么这么设计 → 跳过，从下一节读起。
+
+### 环境
+
+| 项 | 要求 |
+|---|---|
+| 系统 | Windows 10/11 |
+| Python | **3.10–3.13**（**必须带 tkinter**） |
+| Node.js | 20+ |
+| 浏览器 | Chrome（需**手动登录** BOSS 直聘）|
+| LLM | 任意 OpenAI 兼容端点（`base_url` / `model` / `api_key`）|
+
+### 1. 克隆
+
+```bash
+git clone https://github.com/hlan98/JobHunterCat.git jobhuntercat
+cd jobhuntercat
+```
+
+### 2. 安装依赖
+
+```bash
+python -m pip install -r requirements.txt   # 用 python -m pip，避免 pip 不在 PATH
+cd desktop && npm install && cd ..          # Electron 桌宠依赖（装在 desktop/ 下）
+```
+
+> 若这一步失败（`git clone` 超时 / `npm` 或 `pip` 拉不动），说明当前网络访问
+> GitHub、npm registry 或 PyPI 受限 —— 请改用你所在网络可访问的代理或镜像源，再重试。
+
+### 3. 配置
+
+```bash
+mkdir run
+cp memory/templates/config.example.json run/config.json
+```
+
+编辑 `run/config.json`，至少填三项：
+
+- `llm` —— API 端点、模型名、密钥
+- `target_city` —— 投递城市（支持 63 个，见 **[支持城市列表](docs/CITIES.md)**）
+- `resume_send_name` —— 你在 BOSS 上**已上传**的附件简历文件名
+
+### 4. 登录 BOSS
+
+用 Chrome 打开 BOSS 直聘，**手动登录**。
+
+### 5. 启动
+
+双击 **`desktop\启动找工作喵.bat`**，或在 `desktop/` 下执行 `npm start`。
+
+> ⚠️ **这是真实求职环境。** Agent 会真的发送打招呼、简历和回复，**不是模拟**。
+> 详细风险说明见下一节。
+
+---
+
+**想了解它为什么这么设计？继续往下看 ↓**
+
+---
+
 ## ⚠️ 先说清楚：它会真的给 HR 发消息
 
 这不是演示程序。**打招呼、发简历、回复都是真实动作，发出去就收不回来。**
@@ -312,10 +373,15 @@ JobHunter Cat explores a longer loop:
 | 项 | 要求 |
 |---|---|
 | 系统 | Windows 10/11 |
-| Python | 3.8+（**必须带 tkinter**） |
+| Python | **3.10–3.13**（**必须带 tkinter**）|
 | Node.js | 20+ |
-| 浏览器 | Chrome（自己启动并**手动登录 BOSS 直聘**） |
+| 浏览器 | Chrome（自己启动并**手动登录 BOSS 直聘**）|
 | LLM | 任意 OpenAI 兼容端点 |
+
+> **关于 Python 版本**：写 3.10–3.13 而不是 3.8+，是因为实测过 ——
+> 3.8/3.9 上部分依赖已不再提供支持；3.13 上本地 OCR（`rapidocr-onnxruntime`）装不上，
+> 已在 `requirements.txt` 里加了 `python_version < "3.13"` 标记，会自动跳过并回落到视觉 LLM，
+> **不影响其余功能**。
 
 ### 安装
 
@@ -323,9 +389,12 @@ JobHunter Cat explores a longer loop:
 git clone https://github.com/hlan98/JobHunterCat.git jobhuntercat
 cd jobhuntercat
 
-pip install -r requirements.txt      # Python 依赖
-cd desktop && npm install && cd ..   # 桌面壳依赖
+python -m pip install -r requirements.txt   # Python 依赖（推荐 python -m pip 写法）
+cd desktop && npm install && cd ..          # 桌面壳依赖（node_modules 装在 desktop/ 下）
 ```
+
+> 若下载依赖失败，说明当前网络访问 GitHub / npm registry / PyPI 受限 ——
+> 请改用你所在网络可访问的代理或镜像源，再重试同一步。这属于网络环境问题，不是项目缺陷。
 
 ### 配置
 
@@ -337,17 +406,20 @@ cp memory/templates/config.example.json run/config.json
 编辑 `run/config.json`，至少填三项：
 
 - `llm` —— API 端点、模型名、密钥
-- `target_city` —— 投递城市（支持 63 个，见 `agent/shared.py` 的 `CITY_CODES`）
+- `target_city` —— 投递城市（支持 63 个，见 **[支持城市列表](docs/CITIES.md)**；城市码定义在 `agent/main.py` 的 `CITY_CODES`）
 - `resume_send_name` —— 你在 BOSS 上**已上传**的附件简历文件名
 
 ### 启动
 
 ```bash
-# 双击
-scripts\启动找工作喵.bat
+# 双击（注意：是 desktop\ 下那个 —— node_modules 装在 desktop/）
+desktop\启动找工作喵.bat
 
 # 或命令行
 cd desktop && npm start
+
+# ⚠️ scripts\启动找工作喵.bat 只是转发入口（它内部会调用 desktop\ 那个），
+#    如果你改过目录结构，请以 desktop\ 下的为准。
 ```
 
 首次启动前，请先**自己打开 Chrome 并登录 BOSS 直聘**（程序会接管 9222 调试端口）。
@@ -358,6 +430,54 @@ cd desktop && npm start
 
 1. **验证登录态** —— 未登录会打开登录页停下来等你扫码；运行中丢失也会检测
 2. **选择在线附件简历** —— 猫不会自己上传本地 PDF，让你从 BOSS 上已有的附件简历里选一份；没选完就点「开始投递」会直接停止
+
+---
+
+## 🔧 常见问题（Troubleshooting）
+
+### Chrome 连不上 / 9222 端口没开
+程序通过 Chrome 调试端口（默认 **9222**）接管浏览器。
+- 确认你是**以可远程调试的方式**启动的 Chrome，并已手动登录 BOSS 直聘。
+- 端口被占用：换端口需同步改 `run/config.json` 里的调试端口配置。
+
+### LLM 连不上
+检查 `run/config.json` 的 `llm` 段：
+- `base_url`（API Base）是否正确
+- `api_key` 是否填好、是否过期
+- `model` 名是否对得上
+- 网络能否直达该端点（部分 Key 需特定 header 或代理）
+
+### pip 找不到 / 装不上
+不要直接用 `pip`，改成：
+```bash
+python -m pip install -r requirements.txt
+```
+若仍提示找不到 `python`，先确认 Python 已加入 PATH，或改用完整安装路径。
+
+### npm install 失败
+- 确认 Node.js >= 20（`node -v` 自查）。
+- 卡在下载 electron / ffmpeg-static 等二进制（国内网络常见）：这是**网络环境限制**，请换用你所在网络可访问的镜像或代理后重试，与项目无关。
+- 失败后先 `cd desktop && rm -rf node_modules` 再重装，避免半成品缓存。
+
+### BOSS 页面元素变化，选择器失效
+BOSS 直聘前端会更新，可能导致浏览器自动化选择器失效。
+- 先升级到最新版仓库代码。
+- 仍不行请提交 Issue，并附上 `run/logs/` 下的报错日志。
+
+### Agent 启动后不工作 / 不投递
+按顺序排查：
+1. Chrome 是否已登录 BOSS
+2. Chrome 调试端口（9222）是否可用
+3. `run/config.json` 是否填好 `llm` / `target_city` / `resume_send_name`
+4. LLM 是否能正常调用（看日志有无 4xx / 5xx）
+5. 首次运行是否完成了「验证登录态」和「选择在线附件简历」两步（没完成不会投递）
+
+### 猫在，但对话框不说话 / 主进程 spawn 失败
+这是 Python 桥接没起来。程序会自动探测解释器（顺序：MIAO_PYTHON > 随包 > .venv > PATH），需满足：**Python 3.10–3.13 且 tkinter 可用**。
+```bash
+python -c "import tkinter"
+```
+报错则需重装**带 tkinter** 的 Python。
 
 ---
 

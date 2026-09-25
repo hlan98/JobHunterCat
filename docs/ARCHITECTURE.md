@@ -182,7 +182,7 @@ JSON.parse(line)
 | 想加什么 | 在哪加 |
 |---|---|
 | 新招聘平台 | `boss/` 下新建适配器；在 `skill_entry.py` 的 `SCRIPT_REGISTRY` 注册 |
-| 新城市 | `agent/shared.py` 的 `CITY_CODES`（当前 63 个） |
+| 新城市 | `agent/main.py` 的 `CITY_CODES`（当前 63 个，详见 [docs/CITIES.md](docs/CITIES.md)） |
 | 新命令 | `agent/pet_bridge.py` 的 `_dispatch` + 前端 `window.bridge.send` |
 | 新事件 | `agent/main.py` 发出 + `desktop/src/*` 处理（**必须成对**） |
 | 新看板分区 | `dash.html` 加 `<section class="page">` + 导航按钮 |

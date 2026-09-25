@@ -296,7 +296,7 @@ No timelines — only the directions being explored.
 | Item | Requirement |
 |---|---|
 | OS | Windows 10/11 |
-| Python | 3.8+ (**tkinter required**) |
+| Python | **3.10–3.13** (**tkinter required**) |
 | Node.js | 20+ |
 | Browser | Chrome — launch it yourself and **log in to BOSS Zhipin manually** |
 | LLM | Any OpenAI-compatible endpoint |
@@ -321,14 +321,14 @@ cp memory/templates/config.example.json run/config.json
 Edit `run/config.json` and fill in at least three fields:
 
 - `llm` — API endpoint, model name, API key
-- `target_city` — target city (63 supported; see `CITY_CODES` in `agent/shared.py`)
+- `target_city` — target city (63 supported; see **[supported cities](docs/CITIES.md)** — city codes in `agent/main.py`)
 - `resume_send_name` — filename of an attachment resume you have **already uploaded** to BOSS
 
 ### Launch
 
 ```bash
-# double-click
-scripts\启动找工作喵.bat
+# double-click (use the desktop\ one — node_modules lives in desktop\)
+desktop\启动找工作喵.bat
 
 # or from the command line
 cd desktop && npm start
@@ -342,6 +342,54 @@ Not optional — **it will not start applying until both are done**:
 
 1. **Verify login state** — if you are not logged in, it opens the login page and waits for your QR scan; it re-checks if the session drops mid-run
 2. **Select an online attachment resume** — the cat does not upload a local PDF; it asks you to pick one of the attachment resumes already on BOSS. Clicking "Start Applying" before selecting one stops immediately
+
+---
+
+## 🔧 Troubleshooting
+
+### Chrome won't connect / port 9222 not open
+The app takes over Chrome via its debugging port (default **9222**).
+- Make sure you launched Chrome **with remote debugging enabled** and have manually logged into BOSS Zhipin.
+- If the port is taken: change it and update the debug-port setting in `run/config.json` accordingly.
+
+### LLM won't connect
+Check the `llm` block in `run/config.json`:
+- `base_url` (API Base) is correct
+- `api_key` is set and not expired
+- `model` name matches
+- the endpoint is reachable from your network (some keys need a specific header or proxy)
+
+### pip not found / install fails
+Don't use bare `pip`; use:
+```bash
+python -m pip install -r requirements.txt
+```
+If it still says `python` not found, make sure Python is on your PATH or use its full path.
+
+### npm install fails
+- Confirm Node.js >= 20 (`node -v`).
+- Stuck downloading electron / ffmpeg-static binaries (common on restricted networks): this is a **network-environment limit**, not a project bug — retry via a proxy/mirror available to you.
+- On failure, `cd desktop && rm -rf node_modules` before retrying to avoid a half-cached state.
+
+### BOSS page changed, selectors broke
+BOSS Zhipin's frontend updates and may break automation selectors.
+- First update to the latest repo code.
+- Still broken? Open an Issue with the error log from `run/logs/`.
+
+### Agent runs but does nothing / won't apply
+Check in order:
+1. Is Chrome logged into BOSS?
+2. Is the Chrome debug port (9222) available?
+3. Is `run/config.json` filled with `llm` / `target_city` / `resume_send_name`?
+4. Can the LLM be called (any 4xx/5xx in logs)?
+5. Did the first run complete "verify login" and "select online attachment resume"? (applying won't start until both are done)
+
+### Cat shows up but won't talk / main process spawn failed
+The Python bridge didn't start. The app auto-detects the interpreter (MIAO_PYTHON > bundled > .venv > PATH) and requires **Python 3.10–3.13 with tkinter**:
+```bash
+python -c "import tkinter"
+```
+If that errors, reinstall Python **with tkinter**.
 
 ---
 

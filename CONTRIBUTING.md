@@ -26,7 +26,7 @@ Python 内核（业务逻辑）+ Electron 外壳（界面）的双进程应用�
 | 项 | 要求 |
 |---|---|
 | 系统 | Windows 10/11 |
-| Python | 3.8+（**必须带 tkinter**） |
+| Python | 3.10–3.13（**必须带 tkinter**） |
 | Node.js | 20+ |
 | 浏览器 | Chrome（需手动登录 BOSS 直聘，程序接管 9222 端口） |
 
