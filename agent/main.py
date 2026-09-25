@@ -2851,6 +2851,11 @@ class PetApp:
                     try:
                         from boss.boss_chat import run_chat_monitor
                         self.add_log("【验证2-HR监听】开始扫描HR消息（前15个会话）…")
+                        # 2026-09-25 CHATPROG：监听是**同步长调用**（~1~2 分钟），期间只有 add_log，
+                        # 而 add_log 发的是 `log` 事件、聊天窗按 CHAT-NOLOG **不渲染 log**
+                        # → 用户完全看不到进度，界面像卡死（实测踩过）。补一条 bubble 作为可见反馈。
+                        self.root.after(0, lambda: self.set_bubble(
+                            "🔍 正在扫 HR 消息（前 15 个会话，约 1~2 分钟）…"))
                         demo_cfg = dict(self.cfg)
                         demo_cfg["auto_chat_reply"] = False
                         demo_cfg["only_greeted_hr"] = False  # 强制关闭白名单，处理所有前15个会话
@@ -2862,6 +2867,13 @@ class PetApp:
                         _acts = (summary or {}).get("actions", [])
                         _seen = (summary or {}).get("conversations_seen", 0)
                         self.add_log("【验证2-HR监听】扫描完成：发现 %d 个会话，处理了 %d 个动作" % (_seen, len(_acts)))
+                        # 2026-09-25 CHATPROG：完成也要有可见反馈（原来只有 log 事件 → 用户看不到）
+                        _rr = int((summary or {}).get("resume_requests_detected") or 0)
+                        _rj = int((summary or {}).get("rejections_detected") or 0)
+                        _iv = int((summary or {}).get("interview_invites_detected") or 0)
+                        self.root.after(0, lambda s=_seen, a=len(_acts), rr=_rr, rj=_rj, iv=_iv: self.set_bubble(
+                            "✅ HR 监听完成：看了 %d 个会话，处理 %d 个动作"
+                            "（要简历 %d · 拒绝 %d · 面试邀请 %d）。" % (s, a, rr, rj, iv)))
                         for act in _acts:
                             _type = act.get("type", "?")
                             # 2026-09-22 CONV2：结果统计按**公司名**做键
@@ -2906,6 +2918,9 @@ class PetApp:
                         self.add_log("【验证4-tab关闭】监听结束，关闭消息页tab")
                     except Exception as e:
                         self.add_log("【验证2-HR监听】异常：%s" % e)
+                        # 2026-09-25 CHATPROG：异常也要在聊天里可见（原来只有 log 事件）
+                        self.root.after(0, lambda err=e: self.set_bubble(
+                            "⚠️ HR 监听出错：%s" % str(err)[:120]))
 
                 # 临时验证：投递开始前先跑一轮HR监听
                 # 开关见模块顶部 _DEBUG_PRECHAT_ROUND（默认 False = 不预跑）。
