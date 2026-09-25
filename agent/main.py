@@ -395,7 +395,10 @@ class PetApp:
                 self.set_bubble(
                     "喵~我是爬爬！先跟你说一件事：我还没配置 LLM，没法从简历提炼关键词。\n\n"
                     "① 右键点我 →「📊 分析报告」打开看板 → 切到「设置 · LLM」，填好 base_url / 密钥 / 模型 并保存；\n"
-                    "② 然后把简历拖给我，我就给你出方案啦～")
+                    "② 然后把简历拖给我，我就给你出方案啦～\n\n"
+                    "也可以点下面的链接直接打开设置：")
+                # 2026-09-25 CFGLINK：未配置分支也给出可点链接（原来只有文字引导，无入口）
+                self._emit_link("打开 LLM 设置", self.cmd_llm_settings)
             else:
                 # 2026-09-24 RESUMELLM：已配置 → **后台**探一次连通性（不阻塞启动）。
                 # 用户实测：新机器上没配 / 连不上 LLM 时，拖简历会静默降级成「没有关键信息的回复」。
@@ -821,6 +824,26 @@ class PetApp:
                             "请换更清晰、完整包含文字的版本，或改用 PDF / Word / 纯文本简历。"
                             % len(text.strip()))
                 self.root.after(0, lambda: (self.set_bubble(_msg), self.set_state("闲置")))
+                return
+            # 2026-09-25 NOTRESUME：传错文件（如「公司关系」「合同」「报表」）时，
+            # 旧逻辑会把它当简历，提炼出「天眼查、孔旭芳」等假技能写进 config，
+            # 还回一句「简历分析完成」—— 误导用户（用户实测误传 公司关系.pdf）。
+            # 这里加一道「像不像简历」判定：命中简历特征词才放行。
+            _resume_markers = (
+                "简历", "求职", "应聘", "教育经历", "教育背景", "学历", "毕业", "主修",
+                "工作经历", "工作经验", "项目经历", "项目经验", "实习经历", "校园经历",
+                "自我评价", "个人优势", "求职意向", "期望职位", "期望薪资", "技能特长",
+                "获奖", "resume", "curriculum vitae", "education", "experience",
+                "objective", "work history", "skills",
+            )
+            _low = text.lower()
+            _hit = sum(1 for _k in _resume_markers if _k.lower() in _low)
+            if _hit == 0:
+                self.add_log("文件不像简历（0 个简历特征词），已终止；未写入 config / resume.md")
+                self.root.after(0, lambda: (self.set_bubble(
+                    "⚠️ 这个文件看起来**不是简历** —— 我没找到「教育 / 工作 / 项目经历、求职意向」这类内容。\n"
+                    "请确认后把**简历**重新拖给我（支持 PDF / Word / 图片 / 纯文本）。"),
+                    self.set_state("闲置")))
                 return
             self._finish_resume_analysis(text, Path(path).name, path)
 

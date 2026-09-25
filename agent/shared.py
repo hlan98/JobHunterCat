@@ -866,6 +866,12 @@ class LLMClient:
     def is_configured(self) -> bool:
         if not self.base_url or not self.model:
             return False
+        # 2026-09-25 CFGVALID：base_url 必须是真正的 http(s) 地址。
+        # 旧实现只判「非空」→ 模板占位符「<OpenAI 兼容端点>」也算已配置，
+        # 于是新用户照 README 复制模板（URL 未改）后程序误以为配好了 →
+        # 放行上传、却所有 LLM 调用报 unknown url type（用户在新电脑实测踩过）。
+        if not self.base_url.startswith(("http://", "https://")):
+            return False
         if self.api_key:
             return True
         return self.base_url.startswith(("http://127.0.0.1", "http://localhost"))

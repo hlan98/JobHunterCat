@@ -175,6 +175,11 @@ function forwardToWindows(line) {
       || /(正在分析|正在解析|正在生成|正在处理)/.test(_s);
     if (!_transient) chatHistory.push({ role: 'cat', text: String(msg.text) });
   }
+  // 2026-09-25 LINKHIST：超链接（如「打开 LLM 设置」）也要入历史，
+  // 否则关掉对话窗再打开就没了（用户在新电脑实测踩过）。
+  if (msg.type === 'link' && msg.text) {
+    chatHistory.push({ role: 'link', text: String(msg.text) });
+  }
   if (chatHistory.length > HISTORY_LIMIT) chatHistory.shift();
   // 看板窗：snapshot / plan / config / metrics / state
   // 2026-09-21 DASH2：缓存最近一次进度，供看板打开时回放

@@ -142,7 +142,14 @@ window.bridge.onEvent((msg) => {
   // 历史回放：清空当前消息后按顺序重放
   if (msg.type === 'history' && Array.isArray(msg.messages)) {
     msgs.innerHTML = '';
-    msg.messages.forEach((m) => addMsg(m.text, m.role, true));   // 历史回放：直接显示
+    msg.messages.forEach((m) => {
+      // 2026-09-25 LINKHIST：超链接要按链接渲染（addMsg 会当纯文本 → 点不动）
+      if (m && m.role === 'link') {
+        addLink(m.text || '打开 LLM 设置', () => window.bridge.openSettings());
+      } else {
+        addMsg(m.text, m.role, true);   // 历史回放：直接显示
+      }
+    });
     addMsg('—— 以上是之前的对话 ——', 'log');
     return;
   }
