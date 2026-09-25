@@ -48,8 +48,8 @@ node tests/verify_ui_logic.js
 # 代码来源差异分析（改动混合文件后重跑）
 python scripts/provenance_diff.py --baseline <基线包.zip> --markdown
 
-# 启动
-scripts\启动找工作喵.bat
+# 启动（desktop\ 才是真源；scripts\ 那份只是转发到 desktop\）
+desktop\启动找工作喵.bat
 ```
 
 ---
