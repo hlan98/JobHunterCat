@@ -417,17 +417,23 @@ class PetApp:
                         # 只传了 system_prompt，漏掉必填的 user_prompt → 抛
                         # "missing 1 required positional argument: 'user_prompt'"，被 except 误判为
                         # "LLM 连不上"，导致已正确配置的用户也看到这条告警。补上 user_prompt 即可。
+                        # 2026-09-26 PINGTOK：原 max_tokens=50 对**推理模型**太小 ——
+                        # 实测 deepseek-v4-flash-0731：50 → finish_reason=length，
+                        # 53 个 token 全花在 reasoning 上、content **恒为空** →
+                        # 误报「探测返回为空」（且重试永远没用，因为思考必然吃光 50）。
+                        # 实测 200 / 800 均正常返回 pong；抬到 800 留足思考预算。
                         _txt = _llm0.chat_text(
                             "你是连通性自检助手，仅用于确认 LLM 接口是否可用。",
                             "请只回复两个字：pong",
-                            max_tokens=50, temperature=0.0) or ""
+                            max_tokens=800, temperature=0.0) or ""
                         if str(_txt).strip():
                             _ok = True
                         else:
                             self.add_log("启动检查：LLM 连通性异常（返回为空）")
                             self.root.after(0, lambda: self.set_bubble(
                                 "⚠️ LLM 配置看着是好的，但**探测返回为空** ——\n"
-                                "多半是推理模型把输出预算耗在思考上（不是网络/密钥问题），重试通常即可。"))
+                                "多半是推理模型把输出预算耗在思考上（不是网络/密钥问题）；"
+                                "若反复出现，可在「设置 · LLM」换一个非推理模型试试。"))
                     except Exception as _e0:
                         _msg = str(_e0)[:120]
                         self.add_log("启动检查：LLM 连不上（%s）" % _msg)
