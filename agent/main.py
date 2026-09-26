@@ -2106,9 +2106,14 @@ class PetApp:
                     scene, threshold, rows or "（暂无）",
                     payload.get("kw", "?"), payload.get("scanned", 0),
                     payload.get("applied", 0), payload.get("avg", 0), payload.get("top", 0)))
+            # 2026-09-26 AGENTTOK：原 max_tokens=300 对**推理模型**余量太薄 ——
+            # 实测 deepseek-v4-flash-0731：300 时思考 49~85（3/3 正常），但 200 时思考 203、
+            # content 恒空；真实 prompt 比实测更长（含 _llm_stage_brief + 多关键词统计）→
+            # 一旦超预算就拿不到 JSON → raise ValueError → 上层按默认 "continue" 处理，
+            # **且无法与「模型真的说继续」区分**。抬到 800 留足思考预算。
             out = (llm.chat_text(prompt, "当前方案关键词：" + "、".join(
                 (self._plan.get("keywords") or self.cfg.get("target_roles") or [])[:20]),
-                max_tokens=300, temperature=0.2) or "").strip()
+                max_tokens=800, temperature=0.2) or "").strip()
             out = out.strip("`").strip()
             if out.startswith("json"):
                 out = out[4:].strip()
