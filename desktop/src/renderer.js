@@ -21,11 +21,29 @@ const ANGLE_ANCHORS = [
   { angle: 180, frame: 56 }
 ];
 const ANGLE_KEYS = ANGLE_ANCHORS.map(({ angle, frame }) => ({ angle, frame }));
-const frames = Array.from({ length: frameCount }, (_, i) => {
+// 2026-09-28 PETBOOT：原来这里**一次性 new 出 84 个 Image**（2.1MB webp、640×640）——
+// 首屏还没画出来就先解码 84 张图 → 猫窗口出现时卡顿 1~2 秒；
+// 而且每次重建素材后 `ASSET_VERSION` 变了会**绕过磁盘缓存**，卡顿必现（用户实测）。
+// 现在改成**两段加载**：先只加载首帧（首屏就靠它），其余帧等首屏画完再补。
+// 渲染循环本来就只在 `img.complete` 时才换帧 → 后面的帧陆续到位，动画自然补全。
+// ⚠️ 首帧固定用下标 0：`IDLE_FRAME` 在下面才定义（= 0），这里还不能引用它。
+const frames = new Array(frameCount);
+function loadFrame(i) {
+  if (i < 0 || i >= frameCount || frames[i]) return frames[i];
   const img = new Image();
   img.src = `../assets/extracted_frames/frame-${String(i).padStart(3, '0')}.webp?v=${ASSET_VERSION}`;
+  frames[i] = img;
   return img;
-});
+}
+loadFrame(0);                       // 首帧：首屏必需
+function _loadRestFrames() {
+  for (let i = 1; i < frameCount; i++) loadFrame(i);
+}
+if (typeof requestAnimationFrame === 'function') {
+  requestAnimationFrame(() => setTimeout(_loadRestFrames, 0));
+} else {
+  setTimeout(_loadRestFrames, 0);
+}
 
 // ---------- 2026-09-20：工作态素材（开始 / 工作中 / 结束）----------
 // 素材由 tools/build-state-assets.js 生成：640x640、12fps、黑背景已抠透明。
@@ -239,7 +257,8 @@ function renderLoop() {
   currentFrame = (currentFrame + delta * 0.22 + frameCount) % frameCount;
   if (Math.abs(targetFrame - currentFrame) < 0.02) currentFrame = targetFrame;
   const index = Math.max(0, Math.min(frameCount - 1, Math.round(currentFrame) % frameCount));
-  if (frames[index].complete && pet.src !== frames[index].src) pet.src = frames[index].src;
+  // 2026-09-28 PETBOOT：frames 现在是稀疏数组（其余帧后台补），必须容忍 null
+  if (frames[index] && frames[index].complete && pet.src !== frames[index].src) pet.src = frames[index].src;
   requestAnimationFrame(renderLoop);
 }
 function showStatus(text, duration = 1300) {
@@ -276,7 +295,10 @@ window.addEventListener('mousemove', (event) => {
 });
 window.addEventListener('mouseup', () => { pressState = null; if (!dragging) return; dragging = false; stage.classList.remove('dragging'); window.petBridge?.dragEnd(); status.classList.remove('visible'); });
 
-frames[IDLE_FRAME].addEventListener('load', () => { pet.src = frames[IDLE_FRAME].src; });
+// 2026-09-28 PETBOOT：首帧可能还没建好（稀疏数组），加个守卫
+if (frames[IDLE_FRAME]) {
+  frames[IDLE_FRAME].addEventListener('load', () => { pet.src = frames[IDLE_FRAME].src; });
+}
 renderLoop();
 
 // ---- 桥接事件：气泡显示 ----

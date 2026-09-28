@@ -257,7 +257,8 @@ def extract_detail_text(tab: Any) -> str:
 
 def click_apply_button(detail_tab: Any, greeting: str, browser: Any = None,
                        skill_dir: str | Path | None = None,
-                       company: str = "", job: str = "") -> tuple[str, str]:
+                       company: str = "", job: str = "",
+                       enter_chat: bool = False) -> tuple[str, str]:
     # 2026-09-22 OUTCOME1：company/job 只用于**账本记录**（可追溯投了哪条），
     # 不参与任何判断。默认空串 → 老调用方（run_apply 内部流程）行为不变。
     from agent.ledger import record_action
@@ -282,11 +283,69 @@ def click_apply_button(detail_tab: Any, greeting: str, browser: Any = None,
 
     pace_sleep(2.0, 3.5)
 
+    # 2026-09-26 FOLLOWUPGREET-V7：BOSS 点「立即沟通」后会弹「已向BOSS发送消息」——
+    # 取消=「留在此页」、确认=「继续沟通」；**只有点「继续沟通」才会进聊天页**。
+    # 原来代码完全不管这个弹窗 → 永远停在详情页 → 后续补发必然发不出去。
+    # 弹窗结构取自 BOSS 自己的 main.js（见本 fixer docstring）。
+    if enter_chat:
+        _entered = False
+        for _try in range(12):                      # 最多等约 6 秒
+            try:
+                _sug = detail_tab.ele("css:.greet-suggest-dialog", timeout=0.3)
+            except Exception:
+                _sug = None
+            if _sug is not None:
+                _sb = find_clickable_by_text(_sug, ["发送招呼开始聊天", "开始聊天"])
+                if _sb is not None and safe_click(_sb, by_js=None):
+                    time.sleep(1.5)
+            try:
+                _dlg = detail_tab.ele("css:.greet-boss-pop", timeout=0.4)
+            except Exception:
+                _dlg = None
+            if _dlg is not None:
+                # ⚠️ 限定在弹窗内找「继续沟通」——页面上那个同名按钮是「已联系过」，不能点
+                _cb = find_clickable_by_text(_dlg, ["继续沟通"])
+                if _cb is not None and safe_click(_cb, by_js=None):
+                    _entered = True
+                    # 2026-09-26 FOLLOWUPGREET-V8：全过程留痕（原来没找到时什么都不记）
+                    try:
+                        get_logger("job-hunter.boss", skill_dir=skill_dir).info("【跟进招呼】发现『已向BOSS发送消息』弹窗，已点『继续沟通』")
+                    except Exception:
+                        pass
+                    break
+                try:
+                    get_logger("job-hunter.boss", skill_dir=skill_dir).warning("【跟进招呼】发现弹窗但没找到『继续沟通』按钮")
+                except Exception:
+                    pass
+            time.sleep(0.5)
+        if _entered:
+            pace_sleep(2.5, 3.5)                    # 等聊天页加载
+            try:
+                get_logger("job-hunter.boss", skill_dir=skill_dir).info("【跟进招呼】已进入聊天（详情页内抽屉）：%s" % str(getattr(detail_tab, "url", "") or "")[:100])
+            except Exception:
+                pass
+        else:
+            try:
+                get_logger("job-hunter.boss", skill_dir=skill_dir).warning("【跟进招呼】没找到『继续沟通』弹窗（页面结构可能变了）—— 将退回后续兜底")
+            except Exception:
+                pass
+
     # 打招呼策略：BOSS 点「立即沟通」后通常会自动发送平台默认话术（无法修改）。
     # 因此这里的 greeting 作为「补发」的定制招呼：优先在弹窗输入框填；
     # 若没有弹窗输入框（已进聊天页），则在「点沟通后激活的聊天标签页」用聊天输入框补发一句。
     # 补发失败不阻塞投递（BOSS 默认话术已发出，只是少补一句定制招呼）。
     if greeting:
+        # 2026-09-26 DEADCODE-NOTE（V13）：**当前不会执行，但刻意保留**。
+        #   已核实：全项目只有两个调用方 —— main.py:3085 与 boss_apply.py:903，
+        #   两处都硬传 greeting=""（有意只发 BOSS 平台默认话术）→ 本分支是死代码。
+        #   为什么不删：① greeting 是**公开参数**，删掉等于悄悄砍掉一个能力；
+        #   ② 删它属于「减少用户内容」（本项目红线）。故只标注 + 留痕。
+        try:
+            get_logger("job-hunter.boss", skill_dir=skill_dir).info(
+                "【打招呼·自定义话术】greeting 非空，走弹窗补发分支"
+                "（当前两个调用方都传空串，理论上不会走到这里）")
+        except Exception:
+            pass
         sent = False
         # 形态①：弹窗内有打招呼输入框（可填自定义招呼后发送）
         try:
@@ -316,7 +375,7 @@ def click_apply_button(detail_tab: Any, greeting: str, browser: Any = None,
                 sent = False
         if not sent:
             try:
-                get_logger("job-hunter.boss").warning(
+                get_logger("job-hunter.boss", skill_dir=skill_dir).warning(
                     "补发定制打招呼失败（BOSS 默认话术已发出）：%s", greeting
                 )
             except Exception:

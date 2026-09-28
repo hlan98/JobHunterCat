@@ -68,6 +68,9 @@ DEFAULT_SCORING = {
 DEFAULT_CONFIG: dict[str, Any] = {
     "resume_path": "",
     "greeting": DEFAULT_GREETING,
+    # 2026-09-26 FOLLOWUPGREET：打招呼成功后是否再补一条「按岗位+简历定制」的跟进消息。
+    # 默认 True（开）；改 false 可一键关闭。
+    "followup_greeting": True,
     "skills": [],
     "target_roles": [],
     "exclude_keywords": [
@@ -96,8 +99,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "model": "gpt-4o-mini",
         "timeout": 60,
         "temperature": 0.2,
-        # 简历可能含手机号、邮箱等敏感信息；外部 LLM 上传必须显式开启。
-        "allow_resume_upload": False,
+        # 2026-09-27 RESUME-DEFAULT-ON：默认改为 **开**。
+        # 原默认 False 的后果：新用户不点开就永远走本地启发式，分数偏低、容易全被过滤。
+        # ⚠️ 简历可能含手机号、邮箱等敏感信息 —— 界面上必须说明"开启=会外传简历正文"，
+        #    让用户自己能关掉（开关本身仍在 设置 · LLM 里）。
+        "allow_resume_upload": True,
     },
 }
 LOG_SCHEMA_VERSION = 2
@@ -828,7 +834,8 @@ def effective_llm_settings(config: dict[str, Any] | None = None) -> dict[str, An
         "model": str(model).strip(),
         "timeout": int(timeout),
         "temperature": float(temperature),
-        "allow_resume_upload": bool(llm_cfg.get("allow_resume_upload", False)),
+        # 2026-09-27 RESUME-DEFAULT-ON：兜底值同步改成 True（默认开）
+        "allow_resume_upload": bool(llm_cfg.get("allow_resume_upload", True)),
     }
 
 
@@ -861,7 +868,7 @@ class LLMClient:
 
     @property
     def allow_resume_upload(self) -> bool:
-        return bool(self.settings.get("allow_resume_upload", False))
+        return bool(self.settings.get("allow_resume_upload", True))
 
     def is_configured(self) -> bool:
         if not self.base_url or not self.model:
@@ -1025,8 +1032,18 @@ class LLMClient:
 
         # 重试机制：LLM 服务偶发超时/网络波动时自动重试（最多 2 次重试，共 3 次尝试）
         max_attempts = 3
+        # 2026-09-26 BUDGETESC（方案 C）：**预算递增重试**。
+        # 推理模型的思考 token 也计入 max_tokens，预算不够时 content 恒为空；
+        # 原来 3 次重试共用一个预算 → 连撞 3 次还是空。改成只在
+        # 「content 为空」或「finish_reason=length（被截断）」时把预算翻倍再试；
+        # 其余失败（网络超时 / HTTP 错误）**不动预算**，避免无谓花销。
+        _budget = max(1, int(max_tokens))
+        _BUDGET_MIN = 1200      # 首次抬升的下限
+        _BUDGET_MAX = 8000      # 上限（再高也不划算）
         last_exc: Exception | None = None
         for attempt in range(1, max_attempts + 1):
+            payload["max_tokens"] = _budget
+            _grow = False
             try:
                 try:
                     response = self._post_json(payload)
@@ -1035,9 +1052,30 @@ class LLMClient:
                         raise
                     payload.pop("response_format", None)
                     response = self._post_json(payload)
-                return self._extract_json(self._message_content(response))
+                try:
+                    _fr = str(((response.get("choices") or [{}])[0] or {}).get("finish_reason") or "")
+                except Exception:
+                    _fr = ""
+                _content = self._message_content(response)
+                if not _content.strip():
+                    _grow = True
+                    raise RuntimeError(
+                        "LLM 返回内容为空（max_tokens=%d，finish_reason=%s）—— "
+                        "推理模型的思考量可能占满了预算。" % (_budget, _fr or "?"))
+                try:
+                    return self._extract_json(_content)
+                except Exception:
+                    if _fr == "length":
+                        _grow = True      # 被截断 → 不是格式问题，是预算不够
+                    raise
             except (TimeoutError, RuntimeError, Exception) as exc:  # noqa: BLE001
                 last_exc = exc
+                if _grow and attempt < max_attempts:
+                    _next = min(max(_budget * 2, _BUDGET_MIN), _BUDGET_MAX)
+                    if _next <= _budget:
+                        _next = min(_budget + 500, _BUDGET_MAX)
+                    if _next > _budget:
+                        _budget = _next
                 if attempt < max_attempts:
                     time.sleep(2.5 * attempt)
         raise RuntimeError(f"LLM 调用在 {max_attempts} 次尝试后仍失败：{last_exc}")
@@ -1243,7 +1281,7 @@ def build_resume_profile(
     llm_client = llm_client or build_llm_client()
 
     # 默认仅本地规则提取，避免初始化配置时将完整简历上传到第三方。
-    if llm_client.is_configured() and bool(getattr(llm_client, "allow_resume_upload", False)):
+    if llm_client.is_configured() and bool(getattr(llm_client, "allow_resume_upload", True)):
         try:
             payload = llm_client.chat_json(
                 (
@@ -1617,7 +1655,7 @@ def score_jd(
 
     if use_llm:
         llm_cfg = cfg.get("llm") or {}
-        if not bool(llm_cfg.get("allow_resume_upload", False)):
+        if not bool(llm_cfg.get("allow_resume_upload", True)):
             resume_text = ""
         llm_score, llm_reason, llm_evidence, llm_gaps, llm_ok = llm_match_score(
             title=title_clean,

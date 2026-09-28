@@ -992,6 +992,7 @@ def run_chat_monitor(
     interval: float = 30.0,
     resume_pdf: str | Path | None = None,
     baseline_companies: list[str] | None = None,
+    should_stop: Any = None,
 ) -> dict[str, Any]:
     """轮询 BOSS 聊天页，处理要简历/拒绝场景。
 
@@ -1005,6 +1006,16 @@ def run_chat_monitor(
     cfg = load_config(skill_dir) if config is None else config
     mode = normalize_run_mode(mode, cfg)
     logger = get_logger("job-hunter.boss-chat", skill_dir=skill_dir)
+
+    # 2026-09-26 MONITORINT：把「是否该停」收敛成一个判断 —— 磁盘标记 + 调用方内存回调。
+    # should_stop 默认 None → 只有磁盘标记，老调用方行为不变。
+    def _stop_now() -> bool:
+        try:
+            if callable(should_stop) and should_stop():
+                return True
+        except Exception:
+            pass
+        return _user_stop_requested(skill_dir)
 
     if browser is None:
         from agent.shared import connect_browser
@@ -1071,7 +1082,7 @@ def run_chat_monitor(
     try:
         for round_index in range(1, rounds + 1):
             # 2026-09-17 修复：用户按「停止」后立即收尾，不再继续扫下一轮。
-            if _user_stop_requested(skill_dir):
+            if _stop_now():
                 summary["stopped_by_user"] = True
                 logger.info("检测到用户停止标记，聊天监听提前结束。")
                 break
@@ -1104,7 +1115,7 @@ def run_chat_monitor(
 
             for conv in conversations:
                 # 2026-09-17 修复：逐个会话前检查停止标记，按停止后最多再跑完当前一个会话。
-                if _user_stop_requested(skill_dir):
+                if _stop_now():
                     summary["stopped_by_user"] = True
                     logger.info("检测到用户停止标记，聊天监听提前结束。")
                     break
@@ -1375,7 +1386,11 @@ def run_chat_monitor(
 
             save_chat_state(state, skill_dir)
             if round_index < rounds:
-                time.sleep(interval)
+                # 2026-09-26 MONITORINT：可中断等待（原来 time.sleep(30) 期间按停止没反应）
+                _waited = 0.0
+                while _waited < float(interval) and not _stop_now():
+                    time.sleep(0.25)
+                    _waited += 0.25
     finally:
         save_chat_state(state, skill_dir)
         # 监听结束后，只关自己新开的 tab（open_tab 退回主 tab 时不关，避免把投递搜索页关了）

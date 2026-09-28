@@ -21,7 +21,8 @@
     {"cmd":"start"} | {"cmd":"pause"} | {"cmd":"resume"} | {"cmd":"stop"}
     {"cmd":"resume_file","path":"..."}
     {"cmd":"choice","index":1}            # 回传当前等待的面板选择
-    {"cmd":"call","action":"report|config|llm_settings|browser|stop_status|resume"}
+    {"cmd":"call","action":"report|config|llm_settings|browser|stop_status|resume|analyze"}
+    {"cmd":"save_llm", ...} | {"cmd":"save_followup_switch","on":true|false}
 """
 import sys
 import os
@@ -384,6 +385,9 @@ def _build_headless():
                 "model": llm.get("model", ""),
                 # 2026-09-24 RESUMEOPT：把「允许上传简历」开关回填给看板
                 "allow_resume_upload": bool(llm.get("allow_resume_upload", False)),
+                # 2026-09-26 FOLLOWUP-UI：把「打招呼后补一条跟进」开关回填给看板。
+                # ⚠️ 它存在 cfg **顶层**（不是 llm 段），只是搭 llm_settings 这趟车回填。
+                "followup_greeting": bool(self.cfg.get("followup_greeting", True)),
                 # 2026-09-24 RESUMEOPT2：标记「这是拉取，不是保存」→ 看板不弹「已保存」
                 "loaded": True,
             }})
@@ -492,6 +496,9 @@ def _build_headless():
                       "salary_low": sal_low,
                       "exclude_keywords": exclude_kws,
                       "exclude_keywords": exclude_kws,
+                      # 2026-09-28 TITLEEXCL：标题屏蔽词也要回填给看板
+                      # （与 exclude_keywords 的区别：只匹配岗位标题）
+                      "title_exclude_keywords": list(cfg.get("title_exclude_keywords") or []),
                       "salary_high": sal_high,
                       "city": city,
                   },
@@ -699,6 +706,65 @@ def _dispatch(app, cmd):
                     "resume": app.cmd_resume,
                     "analyze": app.cmd_analyze,
                 }.get(fn, lambda: None)()
+        elif action == "save_switch":
+            # 2026-09-27 SAVE-SWITCH：通用开关命令（两个开关共用）。
+            # key → 落点：followup_greeting 在 cfg 顶层；allow_resume_upload 在 cfg["llm"] 下。
+            import json as _js
+            _swkey = str(cmd.get("key") or "")
+            _ALLOW = ("followup_greeting", "allow_resume_upload")
+            if _swkey not in _ALLOW or "on" not in cmd:
+                emit({"type": "switch_saved", "key": _swkey, "on": None,
+                      "save_error": "命令不合法（key 不在白名单或缺 on 字段），未做任何修改"})
+                return
+            _swon = bool(cmd.get("on"))
+            if _swkey == "followup_greeting":
+                app.cfg["followup_greeting"] = _swon
+            else:
+                app.cfg.setdefault("llm", {})
+                app.cfg["llm"]["allow_resume_upload"] = _swon
+            _sw_err = ""
+            try:
+                (Path(__file__).resolve().parent.parent / "run" / "config.json").write_text(
+                    _js.dumps(app.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as _swe:
+                _sw_err = str(_swe)[:80]
+            try:
+                app.add_log("开关 %s：%s%s" % (
+                    _swkey, "已开启" if _swon else "已关闭",
+                    ("（写盘失败：%s）" % _sw_err) if _sw_err else ""))
+            except Exception:
+                pass
+            emit({"type": "switch_saved", "key": _swkey, "on": _swon, "save_error": _sw_err})
+        elif action == "save_followup_switch":
+            # 2026-09-26 FOLLOWUP-UI：「打招呼后补一条跟进」开关，**勾选即生效**。
+            # 为什么不复用 save_llm：那条路有「模型必须来自拉取结果」的硬门槛
+            # （前端 saveLlm 会拦），用户为了关掉一个省 token 的开关还得先重拉模型。
+            import json as _json
+            # 2026-09-27 FOLLOWUP-GUARD（P2-3）：**缺省不动** ——
+            # 原来 `cmd.get("on", True)`，前端漏传 on 会把「花 token 的功能」静默打开。
+            # 与 save_llm 里 allow_resume_upload 的写法保持一致。
+            if "on" not in cmd:
+                emit({"type": "followup_switch",
+                      "on": bool(app.cfg.get("followup_greeting", True)),
+                      "save_error": "命令缺少 on 字段，未做任何修改"})
+                return
+            app.cfg["followup_greeting"] = bool(cmd.get("on"))
+            # 2026-09-27 FOLLOWUP-GUARD（P2-4）：写盘失败要**让用户知道** ——
+            # 原来 except: pass → 内存生效、磁盘没写、重启回滚，用户毫不知情。
+            _fg_save_err = ""
+            try:
+                (Path(__file__).resolve().parent.parent / "run" / "config.json").write_text(
+                    _json.dumps(app.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as _fge:
+                _fg_save_err = str(_fge)[:80]
+            _fg_on = bool(app.cfg.get("followup_greeting", True))
+            try:
+                app.add_log("跟进招呼开关：%s%s" % (
+                    "已开启" if _fg_on else "已关闭",
+                    ("（写盘失败：%s）" % _fg_save_err) if _fg_save_err else ""))
+            except Exception:
+                pass
+            emit({"type": "followup_switch", "on": _fg_on, "save_error": _fg_save_err})
         elif action == "save_llm":
             import json as _json
             app.cfg.setdefault("llm", {})
@@ -826,6 +892,31 @@ def _dispatch(app, cmd):
                     except Exception:
                         pass
                     app.add_log("看板更新屏蔽词（%d 个）：%s" % (len(exs), "、".join(exs[:10])))
+                except Exception:
+                    pass
+            # 2026-09-28 TITLEEXCL：看板编辑「标题屏蔽词」——
+            # 与「屏蔽词」的区别：这个**只匹配岗位标题**（打开详情页之前就砍），
+            # 而「屏蔽词」连 JD 正文一起匹配（容易把"正文里提过"的岗位也误杀）。
+            # ⚠️ 程序内部 `_sync_title_excludes` 会按方案增删 实习/兼职，
+            #    但**保留其它条目** → 用户在这里加的词不会被冲掉。
+            if "title_exclude_keywords" in cmd:
+                try:
+                    texs = [x.strip() for x in
+                            str(cmd["title_exclude_keywords"]).replace("，", ",")
+                            .replace("、", ",").split(",") if x.strip()]
+                    app.cfg["title_exclude_keywords"] = texs
+                    try:
+                        import json as _json_te
+                        _tpe = RUN_DIR / "config.json"
+                        _tce = _json_te.loads(_tpe.read_text(encoding="utf-8"))
+                        _tce["title_exclude_keywords"] = texs
+                        _tpe.write_text(
+                            _json_te.dumps(_tce, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
+                    except Exception:
+                        pass
+                    app.add_log("看板更新标题屏蔽词（%d 个）：%s" % (
+                        len(texs), "、".join(texs[:10])))
                 except Exception:
                     pass
             if "city" in cmd:

@@ -105,8 +105,7 @@ function addLink(text, onClick) {
   el.className = 'msg link';
   const a = document.createElement('a');
   // 注意：href 用普通锚点 '#' + preventDefault 实现，避免使用 JS 伪协议链接
-  // （那类 "js:" 伪协议写法会让杀软启发式把本文件误判为含恶意脚本，
-  //   open-source 副本 9acad8f 曾被误报病毒即源于此）。
+  // （那类 "js:" 伪协议写法会让杀软启发式把本文件误判为含恶意脚本）。
   a.href = '#';
   a.textContent = text;
   a.style.color = '#477ba8';

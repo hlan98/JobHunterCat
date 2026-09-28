@@ -46,6 +46,29 @@ body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(-
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
 .field input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;outline:none;}
 .field input:focus{border-color:var(--coral);}
+/* 2026-09-27 SWITCHUI：iOS 风格滑动开关。
+   ⚠️ 必须用 `.field label.switch` 这种更高特异性：
+      `.field label{display:block;font-size:12px;color:var(--muted)}` 会把它压掉。
+   input 被藏起来但**语义不变**（id/type/checked 照旧）→ JS 不用改。 */
+.field label.switch{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;cursor:pointer;font-size:13px;color:var(--ink);margin-bottom:0;}
+.field label.switch input{position:absolute;opacity:0;width:0;height:0;margin:0;padding:0;border:0;background:none;box-shadow:none;appearance:none;-webkit-appearance:none;pointer-events:none;}
+.field label.switch .txt{flex:1;line-height:1.5;}
+.field label.switch .sub{display:block;color:var(--muted);font-size:12px;margin-top:3px;}
+.field label.switch .track{position:relative;flex:0 0 auto;width:46px;height:26px;border-radius:999px;background:#d8d1c6;transition:background .18s ease;margin-top:1px;}
+.field label.switch .knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .18s ease;}
+.field label.switch input:checked + .track{background:var(--green);}
+.field label.switch input:checked + .track .knob{transform:translateX(20px);}
+.field label.switch input:focus-visible + .track{outline:2px solid var(--coral);outline-offset:2px;}
+/* pending：配置还没拉回来 → 半透明且不可点，避免显示假状态 */
+/* 2026-09-27 SWITCHUI-CLICK：pending **只做视觉提示，绝不能挡点击**。
+   原实现带 `pointer-events:none`，而解除 pending 只依赖后端 config 回包；
+   一旦那一步没发生，开关就彻底点不动（用户实测反馈「点击没反应」）。
+   控件变死比「状态可能不准」严重得多 —— 何况已有「3 秒无回执 → 回滚 + 提示」兜底。 */
+.field label.switch.pending{opacity:.5;}
+/* 2026-09-27 SWITCHUI-BOOT：pending 时滑块**居中 + 虚线轨道** ——
+   明确表达「状态未定」，而不是摆出一个可能骗人的开/关位置 */
+.field label.switch.pending .track{background:#e6e0d7;border:1px dashed #b4b2a9;}
+.field label.switch.pending .knob{transform:translateX(10px);opacity:.55;}
 .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;}
 .tag-green{background:#e3efe8;color:var(--green);}
 .tag-red{background:#f4e0df;color:var(--red);}
@@ -153,8 +176,17 @@ body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(-
             <input id="ov-city" placeholder="广州" class="edit-text">
           </div>
           <div class="icard" style="grid-column:1/-1;">
-            <div class="lb">屏蔽词（命中岗位/JD/薪资即关闭；逗号或顿号分隔）</div>
-            <input id="ov-exclude" placeholder="日结、电商、Tiktok" class="edit-text" style="width:100%;">
+            <div class="lb">屏蔽词（<b>标题和 JD 正文都匹配</b>，命中即关闭；逗号或顿号分隔）</div>
+            <input id="ov-exclude" placeholder="日结、押金、包吃住" class="edit-text" style="width:100%;">
+          </div>
+          <!-- 2026-09-28 TITLEEXCL：把「只匹配标题」的那张表也放出来。
+               两张表区别（用户实测踩过）：
+                 · 这里 → 只查标题，**在打开详情页之前就跳过**（省时间）；
+                 · 上面 → 连 JD 正文一起查，正文里"提过"该词也会被砍（可能误杀）。
+               所以「岗位方向词」（抖音/电商/…）放这里，「垃圾词」（日结/押金/…）放上面。 -->
+          <div class="icard" style="grid-column:1/-1;">
+            <div class="lb">标题屏蔽词（<b>只匹配岗位标题</b>，打开详情页之前就跳过；逗号或顿号分隔）</div>
+            <input id="ov-title-exclude" placeholder="抖音、电商、兼职、实习" class="edit-text" style="width:100%;">
           </div>
           <div class="icard" style="grid-column:1/-1;">
             <div class="lb">投递关键词（逗号分隔）</div>
@@ -226,26 +258,54 @@ body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(-
 
     <!-- 设置 -->
     <section class="page" id="page-settings">
-      <h2>设置 · LLM</h2>
-      <div class="card" style="max-width:520px;">
+      <h2>设置</h2>
+
+      <!-- 2026-09-27 SETTINGS-SPLIT：设置页拆成两个**独立板块**。
+           理由（用户提出）：LLM 接口是投递必经之路、用户很早就配好；
+           而两个开关是投递行为偏好，改的时机完全不同 —— 混在一张卡里会让
+           「保存 LLM 配置」和「切换开关」两种语义互相干扰。 -->
+      <div class="card" style="max-width:520px;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">LLM 接口</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+          投递必经：岗位评分、LLM 主控、生成跟进话术都走这里。改完点「保存」。
+        </div>
         <div class="field"><label>Base URL</label><input id="llm-url" placeholder="例如 https://api.openai.com/v1"></div>
         <div class="field"><label>API Key</label><input id="llm-key" type="password" placeholder="sk-..."></div>
         <div class="field"><label>Model</label><input id="llm-model" placeholder="拉取后从下方列表点选"></div>
-        <!-- 2026-09-24 RESUMEOPT：这个开关原先**界面上没有**，默认 false →
-             岗位评分会把简历清空、永远走启发式（分数偏低、可能全被过滤）。这里补上。 -->
-        <div class="field" style="display:flex;align-items:flex-start;gap:8px;">
-          <input id="llm-allow-resume" type="checkbox" style="width:auto;margin-top:3px;">
-          <label for="llm-allow-resume" style="margin:0;cursor:pointer;line-height:1.5;">
-            允许把简历正文发给 LLM 做匹配评分<br>
-            <span style="color:#8a857d;font-size:12px;">关闭时评分只能走本地启发式，分数会偏低、容易全被过滤。</span>
-          </label>
-        </div>
         <div class="row">
           <button class="btn btn-ghost" onclick="fetchModels()">🔄 拉取模型</button>
           <button class="btn btn-primary" onclick="saveLlm()">💾 保存</button>
         </div>
         <div class="chips" id="llm-models"></div>
         <div id="llm-status" style="margin-top:10px;font-size:12px;"></div>
+      </div>
+
+      <!-- 2026-09-27 SETTINGS-SPLIT：功能开关**独立板块**（与 LLM 接口完全解耦） -->
+      <div class="card" style="max-width:520px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">功能开关</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+          与上面的 LLM 接口相互独立，<b>切换后立即生效</b>，不需要点「保存」。
+        </div>
+        <div class="field">
+          <label class="switch pending" id="llm-allow-resume-wrap">
+            <span class="txt">
+              允许把简历正文发给 LLM 做匹配评分
+              <span class="sub">开启后简历正文（含手机号、邮箱等）会发给 LLM，评分更准但会外传；关闭则只走本地启发式，分数会偏低、容易全被过滤。</span>
+            </span>
+            <input id="llm-allow-resume" type="checkbox">
+            <span class="track"><span class="knob"></span></span>
+          </label>
+        </div>
+        <div class="field">
+          <label class="switch pending" id="llm-followup-greeting-wrap">
+            <span class="txt">
+              打招呼后，再补一条按岗位定制的跟进消息
+              <span class="sub">每个达标岗位会多一次 LLM 调用（约 10~40 秒）并多发给 HR 一条消息。不想花 token 就关掉。</span>
+            </span>
+            <input id="llm-followup-greeting" type="checkbox" checked>
+            <span class="track"><span class="knob"></span></span>
+          </label>
+        </div>
       </div>
     </section>
   </main>
@@ -254,6 +314,29 @@ body{font-family:Inter,'Microsoft YaHei','Segoe UI',sans-serif; background:var(-
 const logs = [];
 const hrMsgs = [];
 function act(o){ window.bridge.send(o); }
+// 2026-09-27 SWITCHUI-ROBUST：开关的辅助 ——
+//  · clearSwitchPending()：配置拉回来后解除「状态未知」的半透明态；
+//  · _fgAckTimer：切换后 3 秒没收到后端回执，就认为前后端版本不一致。
+function clearSwitchPending(){
+  ['llm-allow-resume-wrap','llm-followup-greeting-wrap'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.classList.remove('pending');
+  });
+}
+var _fgAckTimer = null;
+// 2026-09-27 SWITCHUI-BOOT：主动把 LLM 配置拉回来，**带重试**。
+//   不能只靠 `ready` 事件 —— 它是 Python 进程启动瞬间发的，
+//   那时看板窗口常常还没建好 → 事件被丢弃 → 开关一直显示 HTML 默认值。
+var _llmCfgGot = false;
+var _llmCfgTried = 0;
+function pullLlmSettings(){
+  act({cmd:'call', action:'llm_settings'});
+  _llmCfgTried++;
+  if(!_llmCfgGot && _llmCfgTried < 5){
+    setTimeout(pullLlmSettings, 1500);
+  }
+}
+setTimeout(pullLlmSettings, 400);   // 看板自己起来就拉，不等任何启动事件
 function go(p){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.page===p));
   document.querySelectorAll('.page').forEach(s=>s.classList.toggle('active', s.id==='page-'+p));
@@ -264,7 +347,13 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
   // 2026-09-24 RESUMEOPT2：进「设置」页时拉取当前 LLM 配置。
   // 否则输入框与「允许上传简历」勾选框都是空/未勾选 ——
   // 用户一点保存就会把开关改回 false，评分又退回启发式。
-  if(b.dataset.page==='settings') act({cmd:'call', action:'llm_settings'});
+  if(b.dataset.page==='settings'){
+    // 2026-09-27 SETTINGS-SPLIT：进页面先清掉上一次的「已保存 / 连通」残留提示 ——
+    // 否则一进来就看到「✅ 配置已保存」，会以为刚刚又保存了一次（实测反馈）。
+    var _stEl = document.getElementById('llm-status');
+    if(_stEl) _stEl.innerHTML = '';
+    pullLlmSettings();   // 2026-09-27 SWITCHUI-BOOT：带重试
+  }
 });
 
 function addLog(t){
@@ -582,6 +671,10 @@ window.bridge.onEvent(msg=>{
   if(msg.type==='ready'){
     // Python 重启后自动重拉状态
     window.bridge.send({cmd:'get_state'});
+    // 2026-09-27 SWITCHUI-CLICK：顺手把 LLM 配置也拉回来 ——
+    // 原来只有「点设置导航按钮」才拉 llm_settings，若用户不是从导航进设置页
+    // （或后端当时没回），开关会一直停在 pending 拿不到真实值。
+    pullLlmSettings();   // 2026-09-27 SWITCHUI-BOOT：带重试
   }
   if(msg.type==='snapshot'){
     cur = msg;
@@ -591,6 +684,8 @@ window.bridge.onEvent(msg=>{
     document.getElementById('ov-score').value = s.min_score || '';
     document.getElementById('ov-city').value = s.city || '';
     document.getElementById('ov-exclude').value = (s.exclude_keywords||[]).join('、');
+    // 2026-09-28 TITLEEXCL：标题屏蔽词也要回填
+    document.getElementById('ov-title-exclude').value = (s.title_exclude_keywords||[]).join('、');
     document.getElementById('ov-kw').textContent = (s.keywords||[]).length;
     const kl=document.getElementById('ov-kwlist');
     if((s.keywords||[]).length){ kl.innerHTML=s.keywords.map(k=>'<span class="chip">'+k+'</span>').join(''); }
@@ -602,6 +697,27 @@ window.bridge.onEvent(msg=>{
     document.getElementById('ov-resume').textContent = st2.resume_send||0;
     document.getElementById('ov-skip').textContent = st2.skip||0;
     document.getElementById('ov-fail').textContent = st2.fail||0;
+  }
+  if(msg.type==='switch_saved' || msg.type==='followup_switch'){
+    // 2026-09-27 SETTINGS-SPLIT：两个开关共用同一个回执处理。
+    if(_fgAckTimer){ clearTimeout(_fgAckTimer); _fgAckTimer = null; }
+    var _swKey = msg.key || 'followup_greeting';
+    var _swId = (_swKey === 'allow_resume_upload') ? 'llm-allow-resume' : 'llm-followup-greeting';
+    var _swEl = document.getElementById(_swId);
+    // 以后端返回的值为准（可能因「命令不合法未修改」而与点击状态不同）
+    if(_swEl && typeof msg.on === 'boolean') _swEl.checked = msg.on;
+    var _swName = (_swKey === 'allow_resume_upload') ? '上传简历给 LLM' : '打招呼后补跟进';
+    // 2026-09-27 SWITCHUI-ROBUST（P2-4）：写盘失败 / 命令不合法 → 明确告知
+    if(msg.save_error){
+      showToast('⚠️ ' + _swName + '：' + msg.save_error);
+    } else if(typeof msg.on === 'boolean'){
+      showToast((msg.on ? '✅ 已开启：' : '已关闭：') + _swName);
+    }
+  }
+  if(msg.type==='error'){
+    // 2026-09-27 SWITCHUI-ROBUST（P0-1①）：后端「未知命令」原来**没人接** ——
+    // 前端比后端新时，开关命令会落到后端兜底 else 报 error，用户却毫无反馈。
+    showToast('⚠️ ' + (msg.text||'后端返回未知错误'));
   }
   if(msg.type==='llm_test'){
     const box=document.getElementById('llm-status');
@@ -615,8 +731,25 @@ window.bridge.onEvent(msg=>{
       // 2026-09-24 RESUMEOPT：回填「允许上传简历」开关
       var _arEl0 = document.getElementById('llm-allow-resume');
       if(_arEl0 && msg.llm.allow_resume_upload !== undefined) _arEl0.checked = !!msg.llm.allow_resume_upload;
-      // 2026-09-24 RESUMEOPT2：进页面拉取的配置（loaded）不该提示「已保存」
-      if(msg.loaded) return;
+      // 2026-09-26 FOLLOWUP-UI：回填「打招呼后补一条跟进」开关
+      var _fgEl0 = document.getElementById('llm-followup-greeting');
+      if(_fgEl0 && msg.llm.followup_greeting !== undefined) _fgEl0.checked = !!msg.llm.followup_greeting;
+      // 2026-09-27 SWITCHUI-ROBUST：配置已到 → 解除开关的「状态未知」半透明态
+      clearSwitchPending();
+      _llmCfgGot = true;   // 2026-09-27 SWITCHUI-BOOT：拿到了就停止重试
+      // 2026-09-27 APIKEY-MASK：已保存的 Key 用星号回填到 placeholder ——
+      // ① 用户能看到"确实存过"；② 又**不是真实值**，不会误把掩码当 key 存回去
+      //   （save_llm 的语义是"Key 框留空则沿用旧 Key"）。
+      var _kEl = document.getElementById('llm-key');
+      if(_kEl){
+        _kEl.value = '';
+        _kEl.placeholder = maskKey(msg.llm.api_key);
+      }
+      // 2026-09-27 SETTINGS-SPLIT：**只有本端真的点过「保存」才提示「已保存」**。
+      // 原来只靠 msg.loaded 判断 —— 任何来源、任何没带 loaded 的 config 事件都会弹
+      // 「✅ LLM 配置已保存」，用户明明什么都没填也看到这句（实测反馈）。
+      if(msg.loaded || !_llmSavePending) return;
+      _llmSavePending = false;
       const box=document.getElementById('llm-status');
       box.innerHTML='<span style="color:var(--green);font-weight:600;">✅ 配置已保存</span>';
       showToast('✅ LLM 配置已保存');
@@ -652,6 +785,16 @@ function showToast(msg){
 // 2026-09-21：保存 LLM 设置的硬门槛 —— 模型必须来自「拉取结果」。
 // 手填或沿用旧值一律拦下，避免填错模型名导致整条链路静默失效。
 var llmFetchedModels = [];
+// 2026-09-27 SETTINGS-SPLIT：只有**本端点过保存**才提示「已保存」，
+// 其它来源的 config 事件一律静默回填。
+var _llmSavePending = false;
+// 2026-09-27 APIKEY-MASK：已保存的 Key 用星号显示 —— 看得到"存过"，又不是真实值。
+function maskKey(k){
+  k = String(k || '');
+  if(!k) return 'sk-...';
+  if(k.length <= 10) return '已保存（••••••）（留空则沿用）';
+  return '已保存：' + k.slice(0, 6) + '••••••••' + k.slice(-4) + '（留空则沿用）';
+}
 function saveLlm(){
   var u=(document.getElementById('llm-url').value||'').trim();
   var k=(document.getElementById('llm-key').value||'').trim();
@@ -662,10 +805,11 @@ function saveLlm(){
     if(st) st.textContent='请先点「🔄 拉取模型」，再从下方列表里点选一个模型，然后保存。';
     return;
   }
-  // 2026-09-24 RESUMEOPT：一并保存「允许上传简历」开关
-  var _arEl = document.getElementById('llm-allow-resume');
-  window.bridge.send({cmd:'save_llm', url:u, key:k, model:m,
-                      allow_resume_upload: !!(_arEl && _arEl.checked)});
+  // 2026-09-27 SETTINGS-SPLIT：**不再顺带保存任何开关** —— 两个开关已独立成板块、
+  // 切换即存。原来这里会把「上传简历」的勾选状态一起写回去，而**回填之前**那个
+  // 勾选框只是 HTML 默认值 → 用户点一次「保存」就可能把开关静默改错。
+  _llmSavePending = true;
+  window.bridge.send({cmd:'save_llm', url:u, key:k, model:m});
   if(st) st.textContent='✅ 已保存（模型：' + m + '）';
 }
 // URL / Key 一改动，已拉取的清单即作废 —— 必须重新拉取
@@ -673,6 +817,25 @@ function saveLlm(){
   var el=document.getElementById(id);
   if(el) el.addEventListener('input', function(){ llmFetchedModels = []; });
 });
+// 2026-09-27 SETTINGS-SPLIT：两个开关统一「切换即存」，走通用 save_switch 命令 ——
+// 不再挂在 LLM 的「保存」按钮上（那条路有"模型必须来自拉取结果"的硬门槛，
+// 而且回填之前点保存还会把开关状态一起写错）。
+function bindSwitch(elId, cfgKey, label){
+  var el = document.getElementById(elId);
+  if(!el) return;
+  el.addEventListener('change', function(){
+    window.bridge.send({cmd:'save_switch', key: cfgKey, on: !!el.checked});
+    // 2026-09-27 SWITCHUI-ROBUST（P0-1②）：3 秒内没收到回执 → 后端不认识这条命令。
+    if(_fgAckTimer) clearTimeout(_fgAckTimer);
+    _fgAckTimer = setTimeout(function(){
+      _fgAckTimer = null;
+      showToast('⚠️ ' + label + ' 可能没生效：后端没有响应（前后端版本可能不一致）');
+      el.checked = !el.checked;   // 回滚显示，不摆假状态
+    }, 3000);
+  });
+}
+bindSwitch('llm-followup-greeting', 'followup_greeting', '打招呼后补跟进');
+bindSwitch('llm-allow-resume', 'allow_resume_upload', '上传简历给 LLM');
 function fetchModels(){
   window.bridge.send({cmd:'fetch_models', url:document.getElementById('llm-url').value, key:document.getElementById('llm-key').value});
 }
@@ -697,6 +860,12 @@ document.getElementById('ov-score').addEventListener('change', ()=>{
 document.getElementById('ov-exclude').addEventListener('change', ()=>{
   window.bridge.send({cmd:'update_plan',
     exclude_keywords: document.getElementById('ov-exclude').value});
+});
+// 2026-09-28 TITLEEXCL：标题屏蔽词同样失焦即存
+document.getElementById('ov-title-exclude').addEventListener('change', ()=>{
+  window.bridge.send({cmd:'update_plan',
+    title_exclude_keywords: document.getElementById('ov-title-exclude').value});
+  showToast('✅ 标题屏蔽词已保存');
 });
 document.getElementById('ov-city').addEventListener('change', ()=>{
   window.bridge.send({cmd:'update_plan', city: document.getElementById('ov-city').value});

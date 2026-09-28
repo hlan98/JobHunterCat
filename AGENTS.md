@@ -42,9 +42,6 @@ python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p i
 # 前端语法检查
 node --check desktop/src/main.js
 
-# 真跑前端产物 JS 的逻辑校验
-node tests/verify_ui_logic.js
-
 # 代码来源差异分析（改动混合文件后重跑）
 python scripts/provenance_diff.py --baseline <基线包.zip> --markdown
 

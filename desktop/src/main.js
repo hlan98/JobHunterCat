@@ -228,10 +228,25 @@ function createPetWindow() {
     x: wa.x + wa.width - size - 24, y: wa.y + wa.height - size - 18,
     transparent: true, frame: false, resizable: false, alwaysOnTop: true,
     skipTaskbar: true, hasShadow: false,
+    // 2026-09-28 PETBOOT：**等首帧画好再显示** —— 原来 show 默认 true，
+    // 会先出现一个空窗口、隔 1~2 秒才闪出猫（用户实测「猫出现卡顿两秒」）。
+    show: false,
     webPreferences: { preload: path.join(SRC_DIR, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   win.setResizable(false);
   win.setAlwaysOnTop(true, 'floating');
+  // 2026-09-28 PETBOOT：ready-to-show 后显示；⚠️ 兜底定时器不可省 ——
+  // 透明窗口在个别环境下 ready-to-show 可能不触发，那猫就永远不出现了（比卡顿严重得多）。
+  (function (_w) {
+    let shown = false;
+    const doShow = () => {
+      if (shown || !_w || _w.isDestroyed()) return;
+      shown = true;
+      try { _w.show(); } catch (e) {}
+    };
+    _w.once('ready-to-show', doShow);
+    setTimeout(doShow, 1200);
+  })(win);
   win.loadFile(path.join(SRC_DIR, 'index.html'));
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('lock-state', locked);
@@ -290,7 +305,9 @@ function openDashboardWindow(page) {
   }
   dashWin = new BrowserWindow({
     width: 1080, height: 720, minWidth: 900, minHeight: 600,
-    title: '找工作喵 · 看板', show: true, icon: CAT_ICON,
+    // 2026-09-28 PETBOOT：改成 show:false + ready-to-show ——
+    // 原来 show:true 会先出现一个空白窗口，1~2 秒后内容才蹦出来（用户实测）。
+    title: '找工作喵 · 看板', show: false, icon: CAT_ICON,
     webPreferences: { preload: path.join(SRC_DIR, 'dash-preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   // 2026-09-21 DASH1：看板窗口控制台也接到日志 —— 之前只有 chatWin 接了，
@@ -299,6 +316,17 @@ function openDashboardWindow(page) {
     dashWin.webContents.on('console-message', (_e, level, message) => _logMain('dash-console: ' + message));
   } catch {}
   _logMain('openDashboardWindow: 创建看板窗口 page=' + (page || '') + '\n');
+  // 2026-09-28 PETBOOT：首屏渲染好再显示（带兜底定时器，防 ready-to-show 不触发）
+  (function (_w) {
+    let shown = false;
+    const doShow = () => {
+      if (shown || !_w || _w.isDestroyed()) return;
+      shown = true;
+      try { _w.show(); } catch (e) {}
+    };
+    _w.once('ready-to-show', doShow);
+    setTimeout(doShow, 1500);
+  })(dashWin);
   // 2026-09-21 DASH2：加载完成后立刻补发最近一次进度 —— 让看板一打开就有数
   dashWin.webContents.once('did-finish-load', () => {
     if (lastProgress && dashWin && !dashWin.isDestroyed()) {

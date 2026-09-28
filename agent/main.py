@@ -411,12 +411,11 @@ class PetApp:
                 # 2026-09-24 RESUMELLM：已配置 → **后台**探一次连通性（不阻塞启动）。
                 # 用户实测：新机器上没配 / 连不上 LLM 时，拖简历会静默降级成「没有关键信息的回复」。
                 def _llm_ping_startup():
-                    _ok = False   # 2026-09-25 LLMRECOVER：本次探测是否通过（未通过则后台复探）
+                    _ok = False   # 2026-09-25 LLMRECOVER：本次探测是否通过（未通过则标记未就绪）
                     try:
-                        # 2026-09-24 LLMFIX：原写法 chat_text("ping", max_tokens=, temperature=)
-                        # 只传了 system_prompt，漏掉必填的 user_prompt → 抛
-                        # "missing 1 required positional argument: 'user_prompt'"，被 except 误判为
-                        # "LLM 连不上"，导致已正确配置的用户也看到这条告警。补上 user_prompt 即可。
+                        # 2026-09-25 LLMFIX2：原写法只传 system_prompt，漏 user_prompt →
+                        # 抛 "missing 1 required positional argument: 'user_prompt'"，被 except
+                        # 误判为「LLM 连不上」。补上 user_prompt（确定性内容，不耗思考预算）。
                         # 2026-09-26 PINGTOK：原 max_tokens=50 对**推理模型**太小 ——
                         # 实测 deepseek-v4-flash-0731：50 → finish_reason=length，
                         # 53 个 token 全花在 reasoning 上、content **恒为空** →
@@ -426,6 +425,7 @@ class PetApp:
                             "你是连通性自检助手，仅用于确认 LLM 接口是否可用。",
                             "请只回复两个字：pong",
                             max_tokens=800, temperature=0.0) or ""
+
                         if str(_txt).strip():
                             _ok = True
                         else:
@@ -1472,7 +1472,12 @@ class PetApp:
                 "3) …\n\n"
                 "💡 建议（分三类，每类 1~2 条，每条写清「具体怎么做」）\n"
                 "· 关键词：留着 XX（因为…）；换掉 XX（因为…）\n"
-                "· 打招呼：…\n"
+                # 2026-09-28 GREETADVICE：这一格**绝对不要**建议主人改打招呼话术 ——
+                # 打招呼由系统自动完成（平台默认招呼 + AI 按岗位和简历补一句），用户改不了。
+                # 只能从「简历」侧提建议：AI 补的那句话是从简历取材的。
+                "· 打招呼话术：**禁止**建议主人修改或自定义话术（话术由系统自动生成，主人改不了）。"
+                "这一栏只能提「简历怎么改」——例如把量化成果写具体（带数字 / 规模 / 结果），"
+                "因为 AI 补的那句话是从简历里取材的。没得说就写「暂时没特别的」。\n"
                 "· 节奏 / 优先级：…\n"
                 "（某一类暂时没得说，就写「暂时没特别的」）\n\n"
                 "⚠️ 样本还少，先别当结论\n"
@@ -2874,6 +2879,9 @@ class PetApp:
                             config=demo_cfg, skill_dir=RUN_DIR, debug_port=9222,
                             mode="apply" if real else "rehearsal",
                             rounds=1, interval=30.0, baseline_companies=baseline,
+                            # 2026-09-26 MONITORINT：内存停止标志 → 点停止立刻中断
+                            should_stop=lambda: bool(self._stop_requested
+                                                     or self._chat_monitor_stop),
                             resume_pdf=self.cfg.get("resume_pdf_path") or None)
                         _acts = (summary or {}).get("actions", [])
                         _seen = (summary or {}).get("conversations_seen", 0)
@@ -3086,9 +3094,34 @@ class PetApp:
                                     try:
                                         _dt = browser.new_tab(_href)
                                         time.sleep(3)
-                                        _status, _msg = boss_apply.click_apply_button(_dt, "", browser, skill_dir=RUN_DIR, company=company, job=title)
-                                        _dt.close()
+                                        _status, _msg = boss_apply.click_apply_button(_dt, "", browser, skill_dir=RUN_DIR, company=company, job=title, enter_chat=True)
                                         _greeted = (_status == "applied")
+                                        # 2026-09-26 FOLLOWUPGREET：打招呼成功后补一条定制跟进。
+                                        # ⚠️ 必须在 _dt.close() **之前** —— 点沟通有时是「切换」而非「新开」标签页，
+                                        #    先关详情页可能把聊天页一起关掉，导致补发失败。
+                                        # 2026-09-26 FOLLOWUPGREET-V9：**缓存评分**的 ScoreResult
+                                        # 不带 llm_ok（明明是真 LLM 评分）→ 补上 llm_score>0 判断。
+                                        if _greeted and real and (getattr(res, "llm_ok", False)
+                                                                  or getattr(res, "llm_score", 0) > 0):
+                                            self._send_followup_greeting(title, jd, company, browser)
+                                        # 2026-09-26 FOLLOWUPGREET-V12：关详情页前**先看 URL** ——
+                                        # V7 点「继续沟通」后 BOSS 可能把这个 tab 变成聊天页（抽屉），
+                                        # 无条件 close 会把聊天页一起带走（HR 监听还要用）。
+                                        # ⚠️ 保守策略：只有**明确不是聊天页**才关；读 URL 失败也照关
+                                        #   （漏关只是多留一个 tab；误关聊天页更糟）；close 也包 try/except
+                                        #   （页面已消失时原来会抛「与页面的连接已断开」，被记成「真实投递异常」）。
+                                        _du = ""
+                                        try:
+                                            _du = str(getattr(_dt, "url", "") or "").lower()
+                                        except Exception:
+                                            _du = ""
+                                        if "/web/geek/chat" in _du:
+                                            self.add_log("【详情页】该 tab 已是聊天页，保留不关：%s" % title)
+                                        else:
+                                            try:
+                                                _dt.close()
+                                            except Exception as _dce:
+                                                self.add_log("【详情页】关闭失败（忽略）：%s" % str(_dce)[:60])
                                         if _status != "applied":
                                             self._st["apply_fail_streak"] += 1
                                             self.root.after(0, lambda t=title, s=_status, m=_msg: self.add_log(
@@ -3244,6 +3277,9 @@ class PetApp:
                             config=demo_cfg, skill_dir=RUN_DIR, debug_port=9222,
                             mode="apply" if real else "rehearsal",
                             rounds=1, interval=30.0, baseline_companies=baseline,
+                            # 2026-09-26 MONITORINT：内存停止标志 → 点停止立刻中断
+                            should_stop=lambda: bool(self._stop_requested
+                                                     or self._chat_monitor_stop),
                             resume_pdf=self.cfg.get("resume_pdf_path") or None) or {})
                     except Exception as exc:
                         _msum["error"] = str(exc)
@@ -3258,9 +3294,18 @@ class PetApp:
                             time.sleep(0.5)
                     else:
                         time.sleep(0.5)
-                # 停止投递中监听（现在是串行，不需要停后台线程）
+                # 2026-09-26 MONITORINT：置位后**等监听线程真正退出**再往下走。
+                # 原来只置位、不 join（且 _chat_monitor_stop 是「只写不读」的死标志）→
+                # 紧接着又要起「最后一轮结束监听」，两个监听可能同时在 BOSS 上点会话。
                 self._chat_monitor_stop = True
-                self.add_log("投递结束，串行监听已随主循环退出")
+                _mon_wait = 0.0
+                while _mt.is_alive() and _mon_wait < 45.0:
+                    time.sleep(0.5)
+                    _mon_wait += 0.5
+                if _mt.is_alive():
+                    self.add_log("投递中监听仍在收尾（已请求中断，最多再等当前一个会话）")
+                else:
+                    self.add_log("投递结束，串行监听已随主循环退出")
                 # 自动清理浏览器缓存（只清缓存，保留登录 Cookie）
                 # 2026-09-17 修复：原只清 Default/ 下 5 个目录，漏掉 profile 根目录下的
                 # BrowserMetrics / GPUPersistentCache / GrShaderCache / Crashpad 等。
@@ -3269,18 +3314,23 @@ class PetApp:
                 except Exception as e:
                     self.add_log("缓存清理跳过：%s" % str(e)[:80])
                 # 最后做一轮结束监听
-                try:
-                    from boss.boss_chat import run_chat_monitor
-                    demo_cfg = dict(self.cfg)
-                    demo_cfg["auto_chat_reply"] = False
-                    _final_sum = run_chat_monitor(
-                        config=demo_cfg, skill_dir=RUN_DIR, debug_port=9222,
-                        mode="apply" if real else "rehearsal",
-                        rounds=1, interval=30.0, baseline_companies=baseline,
-                        resume_pdf=self.cfg.get("resume_pdf_path") or None) or {}
-                    self.root.after(0, lambda s=dict(_final_sum): self._monitor_summary(s))
-                except Exception as e:
-                    self.add_log("结束监听异常：%s" % e)
+                # 2026-09-26 MONITORINT：上一轮监听线程还没退就**跳过**这一轮 ——
+                # 否则两个 run_chat_monitor 会同时在 BOSS 上点会话（重复访问 + 状态互踩）。
+                if _mt.is_alive():
+                    self.add_log("跳过结束监听：上一轮监听尚未退出（避免两个监听并发访问 BOSS）")
+                else:
+                    try:
+                        from boss.boss_chat import run_chat_monitor
+                        demo_cfg = dict(self.cfg)
+                        demo_cfg["auto_chat_reply"] = False
+                        _final_sum = run_chat_monitor(
+                            config=demo_cfg, skill_dir=RUN_DIR, debug_port=9222,
+                            mode="apply" if real else "rehearsal",
+                            rounds=1, interval=30.0, baseline_companies=baseline,
+                            resume_pdf=self.cfg.get("resume_pdf_path") or None) or {}
+                        self.root.after(0, lambda s=dict(_final_sum): self._monitor_summary(s))
+                    except Exception as e:
+                        self.add_log("结束监听异常：%s" % e)
 
                 # 5/5 收尾简报
                 _wait_if_paused()
@@ -4358,6 +4408,245 @@ class PetApp:
         except Exception:
             pass
         return res
+
+    def _send_followup_greeting(self, title: str, jd: str, company: str, browser) -> None:
+        """2026-09-26 FOLLOWUPGREET：打招呼成功后补一条「按岗位+简历定制」的跟进消息。
+
+        用户拍板的规则：
+        · 只对**新打招呼**的补（已沟通的不补）；调用方已判「必须真实 LLM 评分」；
+        · **只用 LLM 生成**；没有 LLM / 调用失败 / 不像招呼 / 自检不通过 → **一律不发**（无兜底文案）；
+        · 1 条、≤80 字；**硬去重**（公司+岗位 → run/followup_greeted.json）；
+        · 开关 cfg.followup_greeting（默认 True）；用户喊停 → 立刻不发；
+        · **任何失败只记日志/账本，绝不影响投递**。
+        """
+        import json as _json
+        _state = RUN_DIR / "followup_greeted.json"
+        _key = "%s|%s" % (str(company or "").strip(), str(title or "").strip())
+        _own_chat_tab = None      # V9：V6 自己新开的聊天页 tab（发完/出错都要关掉）
+        try:
+            if not bool(self.cfg.get("followup_greeting", True)):
+                # 2026-09-27 FOLLOWUP-TRACE：原来这里**静默返回**（零日志）→
+                # 用户关掉开关后日志里空空如也，分不清「被开关挡了」还是「根本没触发」。
+                self.add_log("【跟进招呼】跳过（开关已关）：%s" % title)
+                return
+            if getattr(self, "_stop_requested", False):
+                self.add_log("【跟进招呼】跳过（用户已停止）：%s" % title)
+                return
+            _done = []
+            try:
+                if _state.exists():
+                    _done = _json.loads(_state.read_text(encoding="utf-8")) or []
+            except Exception:
+                _done = []
+            if _key in set(_done):
+                self.add_log("【跟进招呼】跳过（公司+岗位已补过）：%s" % title)
+                return
+            _resume = self._current_resume()
+            _jd = str(jd or "").strip()
+            if not _resume.strip() or not _jd:
+                self.add_log("【跟进招呼】跳过（缺简历或 JD）：%s" % title)
+                return
+            llm = shared.build_llm_client(self.cfg)
+            if not getattr(llm, "is_configured", lambda: False)():
+                self.add_log("【跟进招呼】跳过（LLM 未配置）：%s" % title)
+                return
+            self.session["llm_calls"] += 1
+            # 2026-09-27 FOLLOWUP-TRACE：把当时读到的开关值一起打出来 ——
+            # 万一「读到的不是我以为的值」（cfg 被重载/换了对象），日志里立刻能看出来。
+            self.add_log("【跟进招呼】开始生成（开关=%s）：%s" % (
+                "开" if self.cfg.get("followup_greeting", True) else "关", title))
+            # 2026-09-26 FOLLOWUPGREET-V2：原 1200 预算对**推理模型**不够 ——
+            # 实测（JD1500+简历2500 字）思考量在 644~2503 之间剧烈波动，
+            # 1200 与 2500 **都会** content 恒空；4000 正常。
+            # 同时把输入缩短（JD→800、简历→1200）显著降低思考量。
+            # 2026-09-26 FOLLOWUPGREET-V11：补发要 10~50 秒且**阻塞投递循环**，
+            # 期间界面无反馈 → 用户会误以为「还在收集岗位」。先弹进度气泡。
+            self.root.after(0, lambda t=title: self.set_bubble(
+                "🔄 正在给「%s」补一条跟进消息（约 10~40 秒）…" % t))
+            _payload = llm.chat_json(
+                (
+                    "你是求职者本人，正在 BOSS 直聘上跟 HR 打招呼。"
+                    "前面已经发过一句系统通用招呼了，**这一句是你自己接着说的** ——"
+                    "要像真人在聊天，**别写成简历摘要**。\n"
+                    "基于【岗位 JD】和【我的简历】，写 40~90 字：\n"
+                    "· 语气：自然、有点温度，像跟人说话，别端着；\n"
+                    # 2026-09-28 FOLLOWUP-WARMTH-V2：**不要只报数字，要说清做过什么**。
+                    # 实测原来会写成「10年+直播运营经验…从0搭建…」这种"标签+数字"堆砌，
+                    # 看不出具体做过什么业务、怎么做的，HR 读不出画面感。
+                    "· 内容：**先说清你具体做过什么**（负责什么业务、怎么做的、结果如何），"
+                    "数字只是佐证 —— **不要只报年限和数字**；挑 1~2 个跟这个岗位最对得上的经历，"
+                    "并点一句「为什么是这个岗位」—— 让 HR 觉得你看过 JD，不是群发；\n"
+                    "· 开头**不要**用「您好/你好」这类通用称呼，直接从岗位或匹配点切入；\n"
+                    "· 结尾**不要**写「方便聊聊吗/期待回复/希望有机会」这类客套或催促。\n"
+                    "硬性要求：① 只写正文，不要解释/前缀/引号/emoji/换行，不要分点；"
+                    "② **不得编造**简历里没有的经历、公司、数字；"
+                    "③ 不要堆形容词，不要用「贵司/本人/致力于/深耕」这类书面腔。\n"
+                    "只输出 JSON：{\"text\":\"…\",\"grounded\":true|false}。"
+                    "grounded = 「这句话里关于**你自己经历/能力**的每个事实都能在简历里找到依据」"
+                    "（对岗位的意向/感叹不算事实，不用它判 grounded）；有任何一处找不到就填 false。"
+                ),
+                (
+                    "岗位标题：%s\n公司：%s\n\n岗位 JD：\n%s\n\n我的简历：\n%s" % (
+                        title, company or "（未知）",
+                        shared.clamp_text(_jd, 800),
+                        shared.clamp_text(_resume, 1200))
+                ),
+                max_tokens=4000, temperature=0.4)
+            if not isinstance(_payload, dict):
+                self.add_log("【跟进招呼】跳过（LLM 返回异常）：%s" % title)
+                return
+            # 2026-09-27 FOLLOWUP-TRACE
+            self.add_log("【跟进招呼】LLM 已返回（%d 字）：%s" % (
+                len(str(_payload.get("text") or "")), title))
+            if not bool(_payload.get("grounded")):
+                self.add_log("【跟进招呼】跳过（自检不通过，疑似编造）：%s" % title)
+                self._record_ledger_action("greet", "followup_ungrounded",
+                                           {"job": title, "company": company})
+                return
+            _txt = str(_payload.get("text") or "")
+            _txt = " ".join(_txt.replace("\n", " ").replace("\r", " ").split())
+            _txt = _txt.strip(" \t" + chr(34) + chr(39) + "“”‘’")
+            if len(_txt) < 8:
+                self.add_log("【跟进招呼】跳过（文案清洗后为空）：%s" % title)
+                return
+            if _txt == str(self.cfg.get("greeting") or "") or _txt == shared.DEFAULT_GREETING:
+                self.add_log("【跟进招呼】跳过（与已发招呼重复）：%s" % title)
+                return
+            # 2026-09-28 FOLLOWUP-WARMTH：硬截 80 → 120 字。
+            # 原来 80 字会把话术**拦腰截断**（日志里出现过「…与本地运」），发给 HR 很难看。
+            _txt = shared.clamp_text(_txt, 120)
+            # 2026-09-26 FOLLOWUP-V13：LLM 生成期间用户可能已点「停止」——
+            # 原来只在函数入口查一次，生成完照样发出去。这里补一次。
+            # 2026-09-27 FOLLOWUP-SWITCHGATE（P1-2）：**开关也要查** ——
+            # 用户在这 10~40 秒里关掉开关，原来仍会发出去（闸门只在入口读过）。
+            if getattr(self, "_stop_requested", False) or not bool(
+                    self.cfg.get("followup_greeting", True)):
+                self.add_log("【跟进招呼】跳过（生成期间用户已停止/关闭开关）：%s" % title)
+                return
+            # 2026-09-26 FOLLOWUPGREET-V3：发送前先确保「聊天页 + 会话」就绪。
+            # 原来直接用 latest_tab + send_chat_reply → 聊天页开着但没选中会话时没有输入框 → 必失败（实测 2/2）。
+            # 2026-09-28 FOLLOWUP-IMPORT-V2：**直接导入**，不要 try/except 兜底。
+            # 原来写成「先试一个包名、失败再退另一个」—— 但本仓库里只存在其中一个，
+            # 于是每次补发都白抛一次 ImportError 再走兜底（能用，但每次多一个异常）。
+            from boss.boss_chat import (send_chat_reply, scan_conversations,
+                                                    open_conversation)
+            # ① 选聊天页：优先 URL 含 /web/geek/chat 的 tab，否则回退 latest_tab
+            _tab = None
+            try:
+                for _t in (browser.get_tabs() if browser is not None else []):
+                    try:
+                        if "/web/geek/chat" in str(getattr(_t, "url", "") or ""):
+                            _tab = _t
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                _tab = None
+            if _tab is None:
+                # 2026-09-26 FOLLOWUPGREET-V6：**主动唤起聊天页**（V3 漏了这一环）——
+                # 找不到现成聊天页 tab 时，新开一个（不干扰详情页），等 SPA 稳定。
+                # 复用项目既有写法：main.py 里 `tab.get("…/web/geek/chat")` + sleep(5)。
+                try:
+                    _tab = browser.new_tab("https://www.zhipin.com/web/geek/chat")
+                    _own_chat_tab = _tab          # V9：自己开的 tab，发完要关（原来从不关 → 孤儿 tab）
+                    # 2026-09-26 FOLLOWUP-V13：改可中断等待（点停止立刻返回）
+                    self._pausable_sleep(5)
+                    self.add_log("【跟进招呼】主动打开聊天页 → %s" % str(getattr(_tab, "url", "") or "")[:110])
+                except Exception as _ge:
+                    self.add_log("【跟进招呼】打开聊天页失败：%s" % str(_ge)[:80])
+                    _tab = None
+            if _tab is None:
+                try:
+                    _tab = browser.latest_tab
+                except Exception:
+                    _tab = None
+            if _tab is None:
+                self.add_log("【跟进招呼】跳过（拿不到聊天页）：%s" % title)
+                self._record_ledger_action("greet", "followup_no_tab",
+                                           {"job": title, "company": company})
+                return
+            _url = ""
+            try:
+                _url = str(getattr(_tab, "url", "") or "")
+            except Exception:
+                pass
+            self.add_log("【跟进招呼】聊天页 = %s" % (_url[:110] or "(空)"))
+            self._pausable_sleep(1.5)      # 与上一条招呼拉开间隔，降低风控概率
+            # 2026-09-26 FOLLOWUP-V13：发送前最后一次停止检查
+            # 2026-09-27 FOLLOWUP-SWITCHGATE（P1-2）：同时认「开关已关」
+            if getattr(self, "_stop_requested", False) or not bool(
+                    self.cfg.get("followup_greeting", True)):
+                self.add_log("【跟进招呼】跳过（发送前用户已停止/关闭开关）：%s" % title)
+                return
+            _ok = bool(send_chat_reply(_tab, _txt))
+            if not _ok:
+                # ② 没输入框 → 扫会话列表，**按公司名匹配**到对应会话再点。
+                # 2026-09-26 FOLLOWUP-V13：V3 原来无条件点开**第一条**（赌「最新 = 刚打招呼那个」）。
+                # 用户肉眼看到别的公司（王女士·隽翼科技）被点开 → 对第三方有可见副作用
+                # （HR 侧可能显示已读/激活），而且点错会话也发不出去。改成：
+                # 只认公司名匹配；匹配不到就**放弃补发**（宁可不发，不乱点别人的会话）。
+                try:
+                    _convs = scan_conversations(_tab) or []
+                    _cn = shared.normalize_text(str(company or ""))
+                    _hit = None
+                    if _cn:
+                        for _c in _convs:
+                            _c = _c or {}
+                            _ct = shared.normalize_text("%s %s %s" % (
+                                _c.get("name") or "", _c.get("company") or "",
+                                _c.get("raw") or ""))
+                            if _cn and _cn in _ct:
+                                _hit = _c
+                                break
+                    self.add_log("【跟进招呼】没找到输入框；会话 %d 条，按公司名「%s」匹配：%s" % (
+                        len(_convs), company or "", "命中" if _hit is not None else "未命中"))
+                    if _hit is not None:
+                        self.add_log("【跟进招呼】命中会话：%s" % str(_hit.get("raw") or "")[:90])
+                        open_conversation(_tab, _hit.get("element"))
+                        self._pausable_sleep(2.0)
+                        _ok = bool(send_chat_reply(_tab, _txt))
+                        self.add_log("【跟进招呼】打开会话后重发：%s" % ("成功" if _ok else "仍失败"))
+                    else:
+                        self.add_log("【跟进招呼】未匹配到该公司会话，放弃补发（不乱点别人的会话）：%s" % title)
+                except Exception as _oe:
+                    self.add_log("【跟进招呼】打开会话失败：%s" % str(_oe)[:90])
+            if _ok:
+                try:
+                    _done.append(_key)
+                    _state.write_text(_json.dumps(_done[-2000:], ensure_ascii=False), encoding="utf-8")
+                except Exception:
+                    pass
+                self.add_log("【跟进招呼】已发：%s → %s" % (title, _txt[:60]))
+                # 2026-09-26 FOLLOWUPGREET-V5：**先记账（审计），再弹气泡（UI）** ——
+                # 气泡若抛异常，不能让 followup_sent 漏记（V4 原来插在记账之前）。
+                self._record_ledger_action("greet", "followup_sent",
+                                           {"job": title, "company": company, "text": _txt[:120]})
+                # 2026-09-26 FOLLOWUPGREET-V4：成功也弹气泡（否则用户以为功能没启动）
+                self.root.after(0, lambda t=title, x=_txt: self.set_bubble(
+                    "✅ 已补一句跟进招呼 · %s：%s" % (t, x[:40])))
+            else:
+                self.add_log("【跟进招呼】发送失败（不重试、不影响投递）：%s" % title)
+                self._record_ledger_action("fail", "followup_send_failed",
+                                           {"job": title, "company": company})
+                self.root.after(0, lambda t=title: self.set_bubble(
+                    "⚠️ 跟进招呼没发出去（已跳过，不影响投递）：%s" % t))
+        except Exception as _e:
+            try:
+                self.add_log("【跟进招呼】异常，本次不补：%s（%s）" % (title, str(_e)[:80]))
+                self._record_ledger_action("fail", "followup_error",
+                                           {"job": title, "company": company, "reason": str(_e)[:80]})
+            except Exception:
+                pass
+        finally:
+            # 2026-09-26 FOLLOWUPGREET-V9：关掉**自己新开**的聊天页 tab
+            # （原来从不关 → 每补发一次多留一个孤儿 tab；HR 监听自己也开自己的、并会关掉）
+            if _own_chat_tab is not None:
+                try:
+                    _own_chat_tab.close()
+                    self.add_log("【跟进招呼】已关闭本次新开的聊天页 tab")
+                except Exception as _ce:
+                    self.add_log("【跟进招呼】关闭聊天页 tab 失败：%s" % str(_ce)[:60])
+                _own_chat_tab = None
 
     def _hide_action_panel(self) -> None:
         if self._action_panel is not None:

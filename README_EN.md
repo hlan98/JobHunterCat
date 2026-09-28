@@ -169,10 +169,24 @@ Everything below is **already implemented**.
 - Rule-based score plus an LLM semantic adjustment
 - Outputs match score, matching evidence, and missing skills
 - **14-day de-duplication**: already-evaluated jobs reuse their cached score instead of spending LLM tokens again
+- **Two blocklist tables** (editable in the dashboard, saved on blur):
+  - **Title blocklist** → matches the **job title only**, skipped **before the detail page is even opened** (saves time)
+  - **Blocklist** → also matches the **JD body**, closes the job on a hit (stricter, but only decided after reading the JD)
+  - Rule of thumb: put **direction words** (Douyin / e-commerce / TikTok …) in the title table and
+    **junk words** (daily payout / deposit / room-and-board …) in the body table. Swapping them makes jobs
+    whose title is clean but whose JD merely mentions the word pay for a wasted detail-page visit.
 
 ### Application Execution
 - Browser automation (DrissionPage over Chrome DevTools Protocol)
 - Automatic greetings and an application ledger
+- **One custom follow-up line after the greeting**: once the "Message" click lands you in the
+  recruiter's chat, the LLM writes one extra 40–90 character message grounded in **that job's JD +
+  your resume** — it says **what you actually did** (business / how / outcome), uses numbers only as
+  support, and names **why this role** so it does not read like a mass blast
+  - **Hard anti-fabrication rule**: every fact must be traceable to your resume; if `grounded=false`
+    it is **not sent** (nothing is sent rather than a fallback line)
+  - One switch in the dashboard (turn it off to save tokens) — **takes effect immediately**
+  - The greeting itself is automatic (platform default + the AI line above); **you never have to write one**
 - **Verifies login state before applying**; if not logged in, it stops and waits for your QR scan
 - **Prompts you to select an online attachment resume**; it will not start until you choose one
 - Rate control: **a random share of qualifying jobs is skipped** to reduce risk-control exposure; failures roll back state
@@ -207,12 +221,18 @@ A fixed interval is too obviously regular, so pauses are **not drawn from a unif
 
 | Step | Pause |
 |---|---|
-| Reading a job detail page (read the JD, then decide) | 1.2–3.0 s, biased short |
-| Before paging to the next job | Mainly 2.5–6 s, ~**6%** chance of a 6–10 s long pause |
-| On hitting an unsuitable job | 0.5–1.0 s, a brief hesitation |
-| Each click or read during chat monitoring | 0.8–4.0 s, split into several bands by action type |
+| Reading a job detail page (read the JD, then decide) | 1.8–4.5 s |
+| Before paging to the next job | 3.8–9.0 s, ~**6%** chance of an extra 9–15 s |
+| On hitting an unsuitable job | 1.2–2.25 s |
+| Loading the search page | 2.25–3.75 s |
+| After a greeting / application | 1.5–3.0 s |
+| Paging and scrolling | 0.45–1.35 s |
+| Forced long rest every 3 keywords | 3.75–6 minutes |
+| Each click or read during chat monitoring | 0.5–3.5 s, split into several bands by action type |
 
-**30+** pause points in total, covering both the application pipeline and chat monitoring. All parameters are **built into the program** — there is no delay setting in the config file.
+Two further **hard rests**: 2 minutes after 3 consecutive greetings; 15 minutes after 2 hours of continuous running.
+
+**40+** pause points in total, covering both the application pipeline and chat monitoring. All parameters are **built into the program** — there is no delay setting in the config file.
 
 ### Job Memory
 - Application outcomes and recruiter reply history
@@ -224,6 +244,9 @@ A fixed interval is too obviously regular, so pauses are **not drawn from a unif
 - Always-on desktop pet (Electron transparent window)
 - Command it in plain language: "widen the salary range to 15–25K", "drop the Douyin Operations keyword"
 - Dashboard: progress bars, application details, analysis reports
+- Settings page split into two blocks: **LLM endpoint** and **Feature switches** (switches **save on
+  toggle**, no "Save" button needed; a stored API key is echoed back **masked with asterisks** so it
+  can never be written back by accident)
 - Key actions are written to a ledger, so everything is observable
 
 ---
