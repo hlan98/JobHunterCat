@@ -3656,13 +3656,34 @@ class PetApp:
             time.sleep(5)
             out = []
             _seen = set()
+            # 2026-09-28 FASTDEDUP：已处理过的岗位链接（便宜判重用，与 _seen 同生命周期）
+            _seen_href = set()
             random_skip_remaining = 0
             block_kws = [k for k in [*(self.cfg.get("title_exclude_keywords") or []),
                                       *(self.cfg.get("exclude_keywords") or [])] if k]
 
             def _collect(cards):
                 nonlocal random_skip_remaining
-                for card in cards:
+                # 2026-09-28 BATCHHREF：整批一次拿回全页卡片 href（1 次 CDP），
+                # 把「每卡 1 次 run_js」（150 张 ≈ 100s）压成 1 次。
+                # 张数不匹配 / 调用失败 → _hrefs_ok=False，逐卡退回（与上一版一致）。
+                _hrefs_batch = []
+                _hrefs_ok = False
+                try:
+                    _hrefs_batch = tab.run_js(
+                        "return (function(){var s=['.job-card-wrap','.job-card-wrapper',"
+                        "'[class*=job-card-wrap]','[class*=job-card-wrapper]'];"
+                        "for(var i=0;i<s.length;i++){var r=document.querySelectorAll(s[i]);"
+                        "if(r.length){return Array.prototype.map.call(r,function(e){"
+                        "var a=e.querySelector('a[href*=job_detail]');return a?a.href:'';});}}"
+                        "return [];})()",
+                        timeout=5) or []
+                    _hrefs_ok = (isinstance(_hrefs_batch, list)
+                                 and len(_hrefs_batch) == len(cards))
+                except Exception:
+                    _hrefs_batch = []
+                    _hrefs_ok = False
+                for _i, card in enumerate(cards):
                     if len(out) >= limit or self._stop_requested:
                         return
                     while self._paused and not self._stop_requested:
@@ -3670,6 +3691,24 @@ class PetApp:
                     if self._stop_requested:
                         return
                     try:
+                        # 2026-09-28 FASTDEDUP/BATCHHREF：便宜判重 —— 只读岗位链接，
+                        # 已处理过的卡片直接跳过，避免对它做整卡文本提取（6~7 次 DOM 查询）。
+                        # 读不到 href 时不跳过，走原路径（行为与改动前一致）。
+                        _href0 = ""
+                        if _hrefs_ok:
+                            try:
+                                _href0 = str(_hrefs_batch[_i] or "")
+                            except Exception:
+                                _href0 = ""
+                        else:
+                            try:
+                                _href0 = card.run_js(
+                                    "return (this.querySelector('a[href*=job_detail]')||{}).href||''",
+                                    timeout=3) or ""
+                            except Exception:
+                                _href0 = ""
+                        if _href0 and _href0 in _seen_href:
+                            continue
                         # 2026-09-24 SLOWTRACE：读卡片计时（只在慢时打日志）
                         _t_st = time.time()
                         info = boss_apply.extract_card_info(card)
@@ -3682,6 +3721,9 @@ class PetApp:
                         if _key in _seen:
                             continue
                         _seen.add(_key)
+                        for _h0 in (_href0, info.get("href") or ""):
+                            if _h0:
+                                _seen_href.add(_h0)
                         # 卡片级标题预过滤：命中排除词（TikTok/电商/日结等）直接跳过，
                         # 不点详情、不调 LLM。只匹配岗位标题，不匹配 JD 正文。
                         _title_clean = normalize_text(title)
@@ -3774,21 +3816,51 @@ class PetApp:
             cards = find_all(tab, boss_apply.CARD_LOCATORS, timeout=3.0)
             if not cards:
                 cards = find_all(tab, ["css:[class*=job-card]"], timeout=2.0)
+            _t_st = time.time()
             _collect(cards)
+            if time.time() - _t_st > 3:
+                self.add_log("⏱ 处理卡片批次耗时 %.1fs（本批 %d 张，已入选 %d）"
+                             % (time.time() - _t_st, len(cards), len(out)))
             # 滚动模拟：分步滚动（每步随机像素、步间随机停顿），
             # 边看边往下翻再抓取，直到抓满 limit 或停止/暂停
             for _s in range(30):
                 if len(out) >= limit or self._stop_requested:
                     break
+                _t_it = time.time()  # 2026-09-28 SLOWTRACE3：整轮计时
+                # 2026-09-28 SLOWTRACE2：滚动翻页链路补埋点（此前该段无埋点，静默空档抓不到）
                 try:
+                    _t_st = time.time()
                     smooth_scroll(tab, steps=3, min_pixel=420, max_pixel=860)
+                    if time.time() - _t_st > 3:
+                        self.add_log("⏱ 滚动耗时 %.1fs" % (time.time() - _t_st))
                 except Exception:
                     pass
                 time.sleep(self._pace("scroll"))
+                # find_all 的每个 eles 都会先等 wait.doc_loaded()（page.timeout=10s），
+                # CARD_LOCATORS 有 4 个 → 页面 loading 时单轮最多静默 4×10=40s。
+                _t_st = time.time()
                 cards = find_all(tab, boss_apply.CARD_LOCATORS, timeout=3.0)
+                if time.time() - _t_st > 3:
+                    try:
+                        _ld = str(getattr(tab.states, "is_loading", "?"))
+                    except Exception:
+                        _ld = "?"
+                    self.add_log("⏱ 抓取卡片耗时 %.1fs（可见 %d 个，页面 loading=%s）"
+                                 % (time.time() - _t_st, len(cards), _ld))
                 if not cards:
+                    _t_st = time.time()
                     cards = find_all(tab, ["css:[class*=job-card]"], timeout=2.0)
+                    if time.time() - _t_st > 3:
+                        self.add_log("⏱ 抓取卡片耗时(兜底) %.1fs（可见 %d 个）"
+                                     % (time.time() - _t_st, len(cards)))
+                _t_st = time.time()
                 _collect(cards)
+                if time.time() - _t_st > 3:
+                    self.add_log("⏱ 处理卡片批次耗时 %.1fs（本批 %d 张，已入选 %d）"
+                                 % (time.time() - _t_st, len(cards), len(out)))
+                if time.time() - _t_it > 3:
+                    self.add_log("⏱ 翻页轮次耗时 %.1fs（可见 %d 张，已入选 %d）"
+                                 % (time.time() - _t_it, len(cards), len(out)))
             self.add_log("关键词「%s」岗位收集完毕：共 %d 个（目标 %d）" % (keyword, len(out), limit))
             return out
 
@@ -4467,7 +4539,7 @@ class PetApp:
                 (
                     "你是求职者本人，正在 BOSS 直聘上跟 HR 打招呼。"
                     "前面已经发过一句系统通用招呼了，**这一句是你自己接着说的** ——"
-                    "要像真人在聊天，**别写成简历摘要**。\n"
+                    "语气自然、口语一点，**别写成简历摘要**。\n"
                     "基于【岗位 JD】和【我的简历】，写 40~90 字：\n"
                     "· 语气：自然、有点温度，像跟人说话，别端着；\n"
                     # 2026-09-28 FOLLOWUP-WARMTH-V2：**不要只报数字，要说清做过什么**。
