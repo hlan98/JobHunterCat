@@ -3683,6 +3683,12 @@ class PetApp:
                 except Exception:
                     _hrefs_batch = []
                     _hrefs_ok = False
+                if not _hrefs_ok:
+                    # 2026-09-28 BATCHDIAG-FIX：整批路径没命中（张数不匹配 / 调用失败）→ 退回逐卡。
+                    # ⚠️ 必须写在 _collect **内部**：_hrefs_ok 是 _collect 的局部变量，
+                    #    在调用点（滚动循环）引用会 NameError → 整个关键词被判「未读到岗位」。
+                    self.add_log("【批量取href】未命中（本批 %d 张，JS 返回 %d 个）→ 退回逐卡"
+                                 % (len(cards), len(_hrefs_batch)))
                 for _i, card in enumerate(cards):
                     if len(out) >= limit or self._stop_requested:
                         return
@@ -3748,6 +3754,8 @@ class PetApp:
                             self._record_ledger_action("skip", "company_filter", {"job": title, "company": company, "reason": _co_kw})
                             self._st["block_hits"] += 1
                             continue
+                        # 2026-09-28 SALARYEARLY-REVERT：薪资预过滤**已回滚**（见 fixer 说明）。
+
                         # 2026-09-19 T：**随机跳过提前** —— 在打开详情页之前决定。
                         # 原实现放在读 JD 之后，等于「先花钱再决定不买」，
                         # 实测 110 个详情页里 34 个是这么白打开的。
@@ -6948,6 +6956,13 @@ class PetApp:
         if Path(cand).exists() and Path(cand).suffix.lower() in RESUME_EXTS:
             self.cmd_resume_file(cand)
             return
+        # 2026-09-28 KWEDIT：明确在改「关键词 / 方案」的说法 → **直接改方案**。
+        # 必须排在下面「提问直通」之前：那条词表含「几个 / 多少」等通用词，
+        # 会把「多加几个关键词」当成提问送去闲聊（用户实测踩到）。
+        if self._looks_like_keyword_edit(text):
+            self._revise_plan(text)
+            return
+
         # 2026-09-24 ROUTESLIM：提问 / 求支招**最先**接住 → 交 LLM 问答。
         # 位置：硬命令门禁（看方案 / 后台 / 停止状态 / 停止 / 文件路径）之后，
         #      其余状态门禁与关键词路由之前 —— 既不抢硬命令，
@@ -7630,6 +7645,8 @@ class PetApp:
         if not t:
             return False
         edit_verb = any(v in t for v in ("去掉", "删除", "移除", "删掉", "增加", "加上",
+                                          # 2026-09-28 KWEDIT：补「加/生成/补/多来/再来」
+                                          "加", "生成", "补", "多来", "再来",
                                           "添加", "换", "改", "调", "屏蔽", "取消"))
         if not edit_verb:
             return False
