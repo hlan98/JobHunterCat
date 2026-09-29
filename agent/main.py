@@ -1508,7 +1508,8 @@ class PetApp:
                 "messages": [{"role": "system", "content": _sys},
                              {"role": "user", "content": prompt}],
                 "temperature": 0.4,
-                "max_tokens": 3000,
+                # 2026-09-29 NOREASON：3000 对推理模型不够（思考就吃光，实测 reasoning=3000/3000）
+                "max_tokens": 8000,
             }
             diag = ""
             _last_err = None
@@ -1523,15 +1524,9 @@ class PetApp:
                     except Exception:
                         pass
                     diag = (llm._message_content(_raw) or "").strip()
-                    if not diag:
-                        # 兜底：少数推理模型把正文放在 reasoning_content
-                        try:
-                            _m = ((_raw.get("choices") or [{}])[0].get("message") or {})
-                            _rc = _m.get("reasoning_content") or _m.get("reasoning") or ""
-                            if isinstance(_rc, str):
-                                diag = _rc.strip()
-                        except Exception:
-                            diag = ""
+                    # 2026-09-29 NOREASON：**不再用 reasoning_content 兜底** —— 那是模型的
+                    # 「思考过程」，发给用户就是泄漏（实测 4582 字思考被当报告发出）。
+                    # content 为空 → 视为本次没产出（继续重试 / 最终明确报错），绝不拿思考充数。
                     if diag:
                         _last_err = None
                         break

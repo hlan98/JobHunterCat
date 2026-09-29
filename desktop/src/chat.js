@@ -141,12 +141,26 @@ window.bridge.onEvent((msg) => {
   // 历史回放：清空当前消息后按顺序重放
   if (msg.type === 'history' && Array.isArray(msg.messages)) {
     msgs.innerHTML = '';
-    msg.messages.forEach((m) => {
+    // 2026-09-29 HISTSLIM：回放瘦身 —— 长会话重开窗口时，上百条 + 超长正文一次糊上来
+    // 会「看着很乱很乱」（用户实测）。这里只回放最近 30 条，且单条超 600 字截断。
+    const HIST_REPLAY_MAX = 30;
+    const HIST_ITEM_MAX = 600;
+    let _hist = (msg.messages || []).filter((m) => m && typeof m.text === 'string');
+    const _histSkipped = Math.max(0, _hist.length - HIST_REPLAY_MAX);
+    _hist = _hist.slice(-HIST_REPLAY_MAX);
+    if (_histSkipped > 0) {
+      addMsg('—— 更早还有 ' + _histSkipped + ' 条对话，已省略 ——', 'log');
+    }
+    _hist.forEach((m) => {
+      let _ht = m.text;
+      if (_ht.length > HIST_ITEM_MAX) {
+        _ht = _ht.slice(0, HIST_ITEM_MAX) + ' …（完整内容以当时为准）';
+      }
       // 2026-09-25 LINKHIST：超链接要按链接渲染（addMsg 会当纯文本 → 点不动）
-      if (m && m.role === 'link') {
-        addLink(m.text || '打开 LLM 设置', () => window.bridge.openSettings());
+      if (m.role === 'link') {
+        addLink(_ht || '打开 LLM 设置', () => window.bridge.openSettings());
       } else {
-        addMsg(m.text, m.role, true);   // 历史回放：直接显示
+        addMsg(_ht, m.role, true);   // 历史回放：直接显示
       }
     });
     addMsg('—— 以上是之前的对话 ——', 'log');
