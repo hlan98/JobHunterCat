@@ -3751,6 +3751,26 @@ class PetApp:
                             continue
                         # 2026-09-28 SALARYEARLY-REVERT：薪资预过滤**已回滚**（见 fixer 说明）。
 
+                        # 2026-09-29 CACHESKIP：两周内评过、**且缓存分已低于阈值**的岗位
+                        # → 连详情页都不开（它反正会被分数砍掉；开详情页是纯浪费 + 平台风控风险）。
+                        # ⚠️ 只在「缓存分 < 阈值」时跳过 ⇒ 结果与改动前**完全一致**（不多投、不漏投）；
+                        #    缓存分达标的仍照常开详情页（保证预过滤与补发文案的 JD 都能拿到）。
+                        try:
+                            _ck = shared.normalize_text((title or "") + (company or ""))
+                            if _ck and self._job_seen_recently(_ck):
+                                _cs = self._get_cached_score(_ck)
+                                _thr = int(shared.match_threshold(title, self.cfg) or 0)
+                                _csv = int(getattr(_cs, "total_score", 0) or 0) if _cs is not None else -1
+                                if _cs is not None and _csv < _thr:
+                                    self.add_log("缓存跳过（两周内评过且低于阈值，未开详情页）：%s（缓存 %d 分 < 阈值 %d）"
+                                                 % (title, _csv, _thr))
+                                    self._record_ledger_action("skip", "cache_low", {"job": title, "company": company,
+                                                                                  "score": _csv, "threshold": _thr})
+                                    self._st["dedup_hits"] += 1
+                                    continue
+                        except Exception:
+                            pass
+
                         # 2026-09-19 T：**随机跳过提前** —— 在打开详情页之前决定。
                         # 原实现放在读 JD 之后，等于「先花钱再决定不买」，
                         # 实测 110 个详情页里 34 个是这么白打开的。
