@@ -260,6 +260,8 @@ class PetApp:
         self._seen_msgs = {}
         self._paused = False
         self._stop_requested = False  # 用户输入「停止」→ 立即中断当前任务
+        # 2026-09-30 STOPREASON：停止来源（user / risk / llm / 空）—— 只用于措辞
+        self._stop_reason = ""
         self._last_kw_stats = []  # 本轮各关键词有效性统计（供停止总结）
         self._last_run_rec = None  # 本轮运行记录（供停止总结）
         # 2026-09-18 复盘报告：本轮已评分岗位明细（只收 LLM 真评分成功的）
@@ -615,6 +617,7 @@ class PetApp:
     def _close_app(self) -> None:
         """窗口退出也走手动停止语义，避免 watchdog 把用户退出误判成崩溃重启。"""
         self._stop_requested = True
+        self._stop_reason = "user"  # STOPREASON：关窗口也属用户行为
         self._paused = False
         try:
             (RUN_DIR / "manual_stop.flag").write_text("user-close", encoding="utf-8")
@@ -778,6 +781,7 @@ class PetApp:
             # 上传新简历 = 手动停止：先停掉当前投递/等待流程，再走新简历分析
             self.set_bubble("📥 收到新简历，先停掉当前流程，以最新简历为准重新走…")
             self._stop_requested = True
+            self._stop_reason = "user"  # STOPREASON：上传新简历也属用户行为
             self._paused = False
             try:
                 (RUN_DIR / "manual_stop.flag").write_text("user-manual-stop", encoding="utf-8")
@@ -2429,6 +2433,7 @@ class PetApp:
     def cmd_stop(self):
         # 喵内投递线程立即响应停止（此前只杀 skill 进程，喵自己跑的线程停不掉 → 「还在跑」）
         self._stop_requested = True
+        self._stop_reason = "user"  # STOPREASON
         self._paused = False
         try:
             (RUN_DIR / "manual_stop.flag").write_text("user-manual-stop", encoding="utf-8")
@@ -3086,11 +3091,33 @@ class PetApp:
                                 # 真实投递：打开详情页真实点击「立即沟通」（BOSS 默认话术）
                                 _greeted = False
                                 if _href:
+                                    # 2026-09-29 GREETDEDUP：本地判重 —— 同一「公司|岗位」
+                                    # 在 14 天内已真实打过招呼 → 不再重复打（实测跨天重复 18/137）。
+                                    # 带时间窗口 ⇒ 超过 14 天允许再联系（防 HR 换人/岗位重发被永久跳过）。
+                                    try:
+                                        if (str(company or "").strip(), str(title or "").strip()) in self._greeted_pairs_recent():
+                                            self.add_log("打招呼跳过（14 天内已给同一「公司|岗位」打过）：%s | %s" % (company, title))
+                                            self._record_ledger_action("skip", "greet_dedup", {"job": title, "company": company})
+                                            continue
+                                    except Exception:
+                                        pass
                                     try:
                                         _dt = browser.new_tab(_href)
                                         time.sleep(3)
                                         _status, _msg = boss_apply.click_apply_button(_dt, "", browser, skill_dir=RUN_DIR, company=company, job=title, enter_chat=True)
                                         _greeted = (_status == "applied")
+                                        # 2026-09-30 GREETDEDUP-RUN：成功后立刻写回
+                                        # 进程内判重缓存 —— 否则同一轮的下一个关键词再遇到
+                                        # 同一「公司|岗位」会再打一次（HR 收到两条一样的招呼）。
+                                        if bool(_greeted):
+                                            try:
+                                                _pc = getattr(self, "_greeted_pairs_cache", None)
+                                                if _pc is None:
+                                                    _pc = self._greeted_pairs_recent()
+                                                _pc.add((str(company or "").strip(),
+                                                         str(title or "").strip()))
+                                            except Exception:
+                                                pass
                                         # 2026-09-26 FOLLOWUPGREET：打招呼成功后补一条定制跟进。
                                         # ⚠️ 必须在 _dt.close() **之前** —— 点沟通有时是「切换」而非「新开」标签页，
                                         #    先关详情页可能把聊天页一起关掉，导致补发失败。
@@ -3194,6 +3221,7 @@ class PetApp:
                             "avg": avg, "top": top})
                         if _dec.get("action") == "stop":
                             self._stop_requested = True
+                            self._stop_reason = "llm"  # STOPREASON
                             self.add_log("LLM 主控指令：停止本轮（%s）" % _dec.get("reason"))
                             break
                         if _dec.get("action") == "adjust" and _dec.get("min_score"):
@@ -3248,10 +3276,23 @@ class PetApp:
                     self._prevent_sleep(False)
                     self._guard_tasks("disable")
                     self._set_applying(False)
-                    self.root.after(0, lambda: (self.set_bubble(
-                        "🛑 已停止，本次投递到此结束。\n点「开始投递」按钮可重新开始。"),
-                        self.set_state("闲置")))
-                    self.add_log("投递已停止（用户请求）")
+                    # 2026-09-30 STOPREASON：按停止来源给正确措辞。此前一律写
+                    # 「用户请求」+「本次投递到此结束」⇒ 风控自动停止被误记成用户点的，
+                    # 还把 RISKDETECT 的风控气泡覆盖掉（用户实测反馈）。
+                    _sr = getattr(self, "_stop_reason", "")
+                    if _sr == "risk":
+                        _bub = ("🛑 检测到 BOSS 安全验证/风控，已**自动停止**投递。\n"
+                                "请到浏览器里手动完成验证；确认页面正常后再点「开始投递」。")
+                        _why = "检测到平台风控，自动停止"
+                    elif _sr == "llm":
+                        _bub = "🛑 LLM 主控判断本轮收益低，已停止。\n点「开始投递」按钮可重新开始。"
+                        _why = "LLM 主控判断停止"
+                    else:
+                        _bub = "🛑 已停止，本次投递到此结束。\n点「开始投递」按钮可重新开始。"
+                        _why = "用户请求"
+                    self.root.after(0, lambda _b=_bub: (self.set_bubble(_b),
+                                                        self.set_state("闲置")))
+                    self.add_log("投递已停止（%s）" % _why)
                     self._stop_summary_llm(rec, list(self._last_kw_stats), True)
                     return
                 self.session["test_run"] = rec
@@ -3782,6 +3823,11 @@ class PetApp:
                             self._record_ledger_action("skip", "random", {"job": title, "company": company})
                             continue
                         if info["href"]:
+                            # 2026-09-30 STOPPRE：开详情页之前再查一次停止标记。
+                            # STOPFAST 的三道检查全在 new_tab 之后 ⇒ 等锁中的卡片仍会开 tab
+                            # （用户点停后 2.3s 实测）。放在拿锁之前：连锁都不用等。
+                            if self._stop_requested:
+                                return
                             try:
                                 # 加锁：和监听线程不同时操作浏览器
                                 # 2026-09-24 SLOWTRACE：这条链路逐步计时，定位静默空档
@@ -3795,12 +3841,55 @@ class PetApp:
                                     dt = browser.new_tab(info["href"])
                                     if time.time() - _t_st > 8:
                                         self.add_log("⏱ 打开详情页耗时 %.1fs" % (time.time() - _t_st))
+                                    # 2026-09-29 STOPFAST：开完 tab 就先看一次停止标记
+                                    if self._stop_requested:
+                                        try:
+                                            dt.close()
+                                        except Exception:
+                                            pass
+                                        return
                                     time.sleep(3)
+                                    if self._stop_requested:
+                                        try:
+                                            dt.close()
+                                        except Exception:
+                                            pass
+                                        return
+                                    # 2026-09-29 RISKDETECT：详情页一出现验证码/风控
+                                    # → **立即停投**（此前只在关键词开头查一次，
+                                    #   收集途中被拦了还会继续刷页面 —— 用户实测「十分危险」）。
+                                    try:
+                                        _rs = shared.check_boss_login(browser, tab=dt)
+                                    except Exception:
+                                        _rs = "unknown"
+                                    if _rs == "blocked":
+                                        self._stop_requested = True
+                                        self._stop_reason = "risk"  # STOPREASON
+                                        self.add_log("🛑 检测到 BOSS 安全验证/风控（%s）→ 已立即停止投递"
+                                                     % ((getattr(dt, "url", "") or "")[:90]))
+                                        self._record_ledger_action("risk", "blocked",
+                                                                   {"url": (getattr(dt, "url", "") or "")[:120]})
+                                        self.root.after(0, lambda: self.set_bubble(
+                                            "🛑 检测到 BOSS 安全验证/风控。\n"
+                                            "已**立即停止投递**，不再继续访问页面。\n"
+                                            "请到浏览器里手动完成验证，确认页面正常后再点「开始投递」。"))
+                                        try:
+                                            dt.close()
+                                        except Exception:
+                                            pass
+                                        return
                                     self.add_log("  → 读 JD 文本 + 薪资信息")
                                     _t_st = time.time()
                                     jd = boss_apply.extract_detail_text(dt) or jd
                                     if time.time() - _t_st > 8:
                                         self.add_log("⏱ 读 JD 耗时 %.1fs" % (time.time() - _t_st))
+                                    # 2026-09-29 STOPFAST：读完 JD 再查一次停止标记
+                                    if self._stop_requested:
+                                        try:
+                                            dt.close()
+                                        except Exception:
+                                            pass
+                                        return
                                     sal_el = shared.find_first(dt, ["css:.salary", "css:.job-salary"], timeout=0.8)
                                     salary_text = shared.safe_text(sal_el) or salary_text
                                     self.add_log("  → 详情页读完，关闭 tab（薪资：%s）" % salary_text)
@@ -4047,6 +4136,46 @@ class PetApp:
         except Exception:
             pass
         return False
+
+    def _greeted_pairs_recent(self, days: int = 14) -> set:
+        """近 N 天内「已真实打过招呼」的 (公司, 岗位) 集合。
+
+        2026-09-29 GREETDEDUP：用于打招呼前的本地判重（数据源 run/ledger/*.jsonl
+        的 greet/applied 记录，带 epoch）。带时间窗口 ⇒ 超过 N 天允许再联系。
+        进程内缓存一次（与 run 同期），失败一律返回空集（**宁可不判重，也不误跳**）。
+        """
+        if getattr(self, "_greeted_pairs_cache", None) is not None:
+            return self._greeted_pairs_cache
+        out = set()
+        try:
+            import json as _j, time as _t
+            _cutoff = _t.time() - int(days) * 86400
+            _ld = RUN_DIR / "ledger"
+            if _ld.is_dir():
+                for _f in sorted(_ld.glob("ledger-*.jsonl"))[-20:]:
+                    try:
+                        for _line in _f.read_text(encoding="utf-8", errors="replace").splitlines():
+                            if not _line.strip():
+                                continue
+                            try:
+                                _r = _j.loads(_line)
+                            except Exception:
+                                continue
+                            if _r.get("action") != "greet" or _r.get("status") != "applied":
+                                continue
+                            if float(_r.get("epoch") or 0) < _cutoff:
+                                continue
+                            _d = _r.get("details") or {}
+                            _co = str(_d.get("company") or "").strip()
+                            _jb = str(_d.get("job") or "").strip()
+                            if _co or _jb:
+                                out.add((_co, _jb))
+                    except Exception:
+                        continue
+        except Exception:
+            out = set()
+        self._greeted_pairs_cache = out
+        return out
 
     def _get_cached_score(self, key: str):
         """如果这个岗位在两周内已评估过，直接返回之前的评分结果，不用再调用 LLM"""
@@ -6821,6 +6950,7 @@ class PetApp:
         except Exception:
             pass
         self._stop_requested = True
+        self._stop_reason = "risk"  # STOPREASON：疑似风控硬停止
         self._paused = False
         self._guard_tasks("disable")
         self._set_applying(False)

@@ -71,7 +71,7 @@
 
 ## 核心模块
 
-### `agent/main.py` — 主程序（7,721 行）
+### `agent/main.py` — 主程序（7,955 行）
 Tk 桌面 UI + 全流程编排。所有流程的调度中枢：方案生成、投递循环、HR 监听、
 LLM 接管、停止总结、看板事件推送。
 
@@ -80,7 +80,7 @@ stdin/stdout JSON 协议，把 Python 内核接给 Electron 壳。
 负责 `cmd:` 命令分发与 `type:` 事件发射。
 看板侧的「LLM 接口」「功能开关」「屏蔽词」都由这里读写并落盘 `run/config.json`。
 
-### `boss/boss_apply.py` — BOSS 自动投递核心（1,034 行）
+### `boss/boss_apply.py` — BOSS 自动投递核心（1,042 行）
 强制用 DrissionPage 接管本地 9222 端口浏览器。
 岗位收集 → 卡片预过滤 → JD 读取 → 评分 → 打招呼。
 
@@ -96,7 +96,7 @@ stdin/stdout JSON 协议，把 Python 内核接给 Electron 壳。
 > **不是**按上面的列举顺序。
 > **只有「要简历」和「拒绝」会真的发出消息**，其余三类一律只提醒、不代答。
 
-### `agent/shared.py` — 公共内核（2,370 行）
+### `agent/shared.py` — 公共内核（2,379 行）
 配置读写、日志、LLM 客户端、评分逻辑、浏览器接管、DOM 工具。
 `chat_json` 内置**递增预算重试**（推理模型的思考 token 会吃满 `max_tokens`，
 空回复时自动把预算翻倍再试，而不是拿同一个预算连撞三次）。

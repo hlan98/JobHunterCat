@@ -1887,10 +1887,19 @@ def check_boss_login(browser: Any, *, tab=None, timeout: float = 6.0) -> str:
         # BOSS 正常岗位页可能携带 `_security_check=1` 查询参数，不能仅凭
         # URL 中出现 security 就判定风控；必须有明确验证文案或验证专用路径。
         url_lower = url.lower()
-        if "安全验证" in body or "/security/" in url_lower or "/passport/zp/security" in url_lower:
+        # 2026-09-29 RISKMARK：放宽风控识别（用户实测漏判 —— BOSS 直接弹验证码、
+        # 提示「存在风险行为」，旧判据只认「安全验证/访问受限/异常行为」+URL ⇒ 没拦住）。
+        # 「正文类」判据加**短页面约束**：验证/风控页都很短，正常 JD 页很长 → 防误停。
+        _risk_words = ("安全验证", "验证码", "滑块", "拖动滑块", "人机验证",
+                       "请完成验证", "存在风险", "风险行为", "异常行为", "访问受限",
+                       "操作频繁", "访问过于频繁", "操作过于频繁")
+        if ("/security" in url_lower or "passport/zp" in url_lower
+                or "captcha" in url_lower or "/verify" in url_lower):
+            return "blocked"
+        if any(w in body for w in _risk_words) and len(body.strip()) < 2000:
             return "blocked"
         # 风控 403：IP/账号被临时限制访问
-        if ("访问受限" in body or "异常行为" in body) and ("403" in url or "passport/zp" in url):
+        if ("403" in url or "passport/zp" in url) and any(w in body for w in _risk_words):
             return "blocked"
         # 未登录：右上角为「我要招聘 / 我要找工作」
         if "我要找工作" in body and "我要招聘" in body:

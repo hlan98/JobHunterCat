@@ -194,12 +194,20 @@ def salary_policy_reason(salary_text: str, config: dict[str, Any] | None = None)
     low, high, parsed = parse_salary_range(text)
     if not parsed:
         return "薪资无法解析"
-    reasons = []
+    # 2026-09-30 SALARYOR（用户拍板「可以放宽」）：
+    # 原实现要求「下限>=low_req **且** 上限>=high_req」（区间完整覆盖期望区间），
+    # 实测过严：2026-09-30 一天 55 个被砍岗位里「12-24K」「13-22K」「15-21K」
+    # 全被砍，而这些明显能给到期望薪资。改成 OR 后**只新增通过岗位，
+    # 不减少任何一个原本通过的**（纯放宽，可随时回退）。
+    if low_req and high_req:
+        if low < low_req and high < high_req:
+            return "上限{}<{}K且下限{}<{}K".format(high, high_req, low, low_req)
+        return None
     if low_req and low < low_req:
-        reasons.append("下限{}<{}K".format(low, low_req))
+        return "下限{}<{}K".format(low, low_req)
     if high_req and high < high_req:
-        reasons.append("上限{}<{}K".format(high, high_req))
-    return "且".join(reasons) or None
+        return "上限{}<{}K".format(high, high_req)
+    return None
 
 
 def extract_card_info(card: Any) -> dict[str, str]:
