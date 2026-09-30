@@ -181,6 +181,76 @@ LONG_REST_DEMO_SCALE = 6.0  # 演示加速：150~240s → 25~40s
 
 # 投递浏览器（9222 调试端口 + BOSS 登录态目录）
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+
+def _chrome_candidates():
+    """按可靠性依次给出 Chrome 可执行文件的候选路径（可能不存在）。
+
+    2026-09-30 CHROMEPATH：Chrome 的安装位置不止一个 ——
+      · 管理员安装 → `%ProgramFiles%`；
+      · 32 位/旧安装 → `%ProgramFiles(x86)%`；
+      · **「仅为我安装」（非管理员，Chrome 现在的默认推荐）→ `%LOCALAPPDATA%`**。
+    原来只认 `%ProgramFiles%` 那一个 ⇒ 后两种用户**装了也被判「未检测到」**。
+    """
+    import os as _o
+    import shutil as _sh
+    out = []
+    # ① 注册表 App Paths（安装器必写：管理员装写 HKLM，仅为我装写 HKCU）
+    try:
+        import winreg as _wr
+        for _root in (_wr.HKEY_LOCAL_MACHINE, _wr.HKEY_CURRENT_USER):
+            for _sub in (r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
+                         r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"):
+                try:
+                    with _wr.OpenKey(_root, _sub) as _k:
+                        _p = _wr.QueryValueEx(_k, "")[0]
+                    if _p:
+                        out.append(str(_p))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    # ② 三个标准安装位置
+    for _env, _tail in (("ProgramFiles", r"Google\Chrome\Application\chrome.exe"),
+                        ("ProgramFiles(x86)", r"Google\Chrome\Application\chrome.exe"),
+                        ("LOCALAPPDATA", r"Google\Chrome\Application\chrome.exe")):
+        _base = _o.environ.get(_env)
+        if _base:
+            out.append(_o.path.join(_base, _tail))
+    # ③ 原来的硬编码路径（兜底：老机器行为不变）
+    out.append(CHROME_PATH)
+    # ④ PATH 里能找到（少数安装方式会加）
+    try:
+        _w = _sh.which("chrome")
+        if _w:
+            out.append(_w)
+    except Exception:
+        pass
+    # 去重（保序）
+    _seen = set()
+    _uniq = []
+    for _c in out:
+        _n = _o.path.normcase(_o.path.normpath(_c))
+        if _n not in _seen:
+            _seen.add(_n)
+            _uniq.append(_c)
+    return _uniq
+
+
+def _find_chrome_exe():
+    """返回 Chrome 可执行文件路径；找不到返回 None。
+
+    ⚠️ **故意不做缓存**：流程是「没装 → 用户去装 → 用户说装好了 → 重新检测」，
+    一旦缓存了 None，用户装完也永远检测不到。
+    """
+    import os as _o
+    for _c in _chrome_candidates():
+        try:
+            if _o.path.isfile(_c):
+                return _c
+        except Exception:
+            pass
+    return None
 CHROME_USER_DIR = str(RUN_DIR / ".job_hunter" / "browser" / "boss")
 
 # 对话框可接收的简历文件格式
@@ -1758,8 +1828,14 @@ class PetApp:
         """拉起 9222 投递浏览器（带 BOSS 登录态目录），等待端口就绪（最多 40 秒）。"""
         import subprocess
         from agent.shared import is_cdp_port_ready
+        # 2026-09-30 CHROMEPATH：先解析出真实的 chrome.exe（可能不在 Program Files）
+        _exe = _find_chrome_exe()
+        if not _exe:
+            self.add_log("拉起浏览器失败：未找到 chrome.exe。已探测：%s"
+                         % "；".join(_chrome_candidates()))
+            return False
         try:
-            subprocess.Popen([CHROME_PATH,
+            subprocess.Popen([_exe,
                               "--remote-debugging-port=9222",
                               "--user-data-dir=" + CHROME_USER_DIR,
                               "--no-first-run", "--no-default-browser-check",
@@ -2324,10 +2400,14 @@ class PetApp:
 
     # ---------- 新增情况1：未检测到 Chrome → LLM 教会用户安装 ----------
     def _chrome_ok(self) -> bool:
-        """检测 Chrome 是否已安装（用于投递浏览器）。"""
+        """检测 Chrome 是否已安装（用于投递浏览器）。
+
+        2026-09-30 CHROMEPATH：改走 `_find_chrome_exe()` —— 它探测
+        注册表 + Program Files / Program Files (x86) / %LOCALAPPDATA% / PATH，
+        不再只认一个硬编码路径（否则「仅为我安装」的用户永远被判「未检测到」）。
+        """
         try:
-            import os as _os
-            return _os.path.exists(CHROME_PATH)
+            return bool(_find_chrome_exe())
         except Exception:
             return False
 

@@ -71,7 +71,7 @@
 
 ## 核心模块
 
-### `agent/main.py` — 主程序（7,955 行）
+### `agent/main.py` — 主程序（8,035 行）
 Tk 桌面 UI + 全流程编排。所有流程的调度中枢：方案生成、投递循环、HR 监听、
 LLM 接管、停止总结、看板事件推送。
 
@@ -110,7 +110,6 @@ stdin/stdout JSON 协议，把 Python 内核接给 Electron 壳。
 逐项检查 Python / 依赖 / 配置 / LLM，缺什么、怎么补。
 
 ### `agent/skill_entry.py` — CLI 入口（556 行）
-
 ### `desktop/src/` — 桌面壳（Electron）
 - `main.js` — 主进程、窗口管理、事件转发、Python 进程拉起
 - `renderer.js` — 桌宠渲染（透明窗、状态素材切换）
